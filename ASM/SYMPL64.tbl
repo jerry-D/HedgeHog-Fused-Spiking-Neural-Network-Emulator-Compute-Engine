@@ -1,0 +1,2302 @@
+; Instruction table for SYMPL 64-Bit Universal Floating-point ISA Compute Engine 
+; version 3.02   November 30, 2019 
+; Author:  Jerry D. Harthcock
+; Copyright (C) 2019.  All rights reserved.
+;// Author:  Jerry D. Harthcock
+;// Version:  1.22  May 3, 2020
+;// Copyright (C) 2020.  All rights reserved.
+;//
+;////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+;//                                                                                                                    //
+;//                                                    Open-Source                                                     //
+;//                          HedgeHog Fused Spiking Neural Network Emulator/Compute Engine                             //
+;//                                          Limited Use Commercial License                                            //
+;//                                                                                                                    //
+;//                                                                                                                    //
+;// Open-source means:  this source code and this instruction set ("this IP") may be freely downloaded, copied,        //
+;// modified, distributed and used in accordance with the terms and conditons of the licenses provided herein.         //
+;//                                                                                                                    //
+;// Provided that you comply with all the terms and conditions set forth herein, Jerry D. Harthcock ("licensor"),      //
+;// the original author and exclusive copyright owner of this HedgeHog Fused Spiking Neural Network Emulator/Compute   //
+;// Engine, including related development software ("this IP"), hereby grants to recipient of this IP ("licensee"),    //
+;// a world-wide, paid-up, non-exclusive license to implement and commercially use this IP within the programmable     //
+;// fabric of Xilinx Kintex Ultra Plus brand FPGAs--only.                                                              //
+;//                                                                                                                    //
+;// Furthermore, limited to the purposes of prototyping, evaluation, characterization and testing of implementations   //
+;// in a hard, custom or semi-custom ASIC, any university or institution of higher education may have their            //
+;// implementation of this IP produced for said limited purposes at any foundary of their choosing provided that such  //
+;// prototypes do not ever wind up in commercial circulation, with this license extending to such foundary and is in   //
+;// connection with said academic pursuit under the supervision of said university or institution of higher education. //
+;//                                                                                                                    //
+;// Any copying, distribution, customization, modification, or derivative work of this IP must include an exact copy   //
+;// of this license and original copyright notice at the very top of each source file and any derived netlist, and,    //
+;// in the case of binaries, a printed copy of this license and/or a text format copy in a separate file distributed   //
+;// with said netlists or binary files having the file name, "LICENSE.txt".  You, the licensee, also agree not to      //
+;// remove any copyright notices from any source file covered or distributed under this Limited Use Commercial License.//                               //
+;//                                                                                                                    //
+;// LICENSOR DOES NOT WARRANT OR GUARANTEE THAT YOUR USE OF THIS IP WILL NOT INFRINGE THE RIGHTS OF OTHERS OR          //
+;// THAT IT IS SUITABLE OR FIT FOR ANY PURPOSE AND THAT YOU, THE LICENSEE, AGREE TO HOLD LICENSOR HARMLESS FROM        //
+;// ANY CLAIM BROUGHT BY YOU OR ANY THIRD PARTY FOR YOUR SUCH USE.                                                     //
+;//                                                                                                                    //
+;// Licensor reserves all his rights, including, but in no way limited to, the right to change or modify the terms     //
+;// and conditions of this Limited Use Commercial License anytime without notice of any kind to anyone.                //
+;// By using this IP for any purpose, licensee agrees to all the terms and conditions set forth in this Limited Use    //
+;// Commercial License.                                                                                                //
+;//                                                                                                                    //
+;// This Limited Use Commercial License does not include the right to implement or commercially use this IP or any     //
+;// IP derived from this IP in any device other than Xilinx Kintex Ultra Plus brand FPGAs. If you would like to obtain //
+;// such a license, please contact Licensor.                                                                           //
+;//                                                                                                                    //
+;// Licensor can be contacted at:  SYMPL.gpu@gmail.com or Jerry.Harthcock@gmail.com                                    //
+;//                                                                                                                    //
+;////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+; 
+;                                                                                                                      
+; A copy of Cross-32 can be purchased from
+; Data-Sync Engineering at: http://www.cdadapter.com/cross32.htm  sales@datasynceng.com
+; A copy of the Cross-32 manual can be viewed online here:  http://www.cdadapter.com/download/cross32.pdf
+; For instrucion table support, contact the author of this table at: SYMPL.gpu@gmail.com
+
+; The SYMPL 64-Bit Universal Floating-point ISA Compute Engine employs a modified Harvard architecture, meaning that it 
+; comprises separate program and data memory buses. It has immediate, direct and indirect addressing modes, as well as 
+; table read from program memory using direct or indirect addressing mode.  The modified Harvard model can be implemented as
+; either a conventional processor or a interleaving, multi-threading processor, wherein said multi-threading threads share the same
+; operators, but have their own processor registers (such as PC, SP, Auxiliary Registers, Status Register, etc.) and can
+; share some or all the system memory.  This ISA can be easily adapted as a Von Neumann memory model as well.
+
+; This "opcode-less" SYMPL 64-Bit Universal Floating-point ISA Compute EngineA has only seven mnemonics: "_", "P", "N" and "Z", "ACT", "ACC" and "AA",
+; which can be used to specify the rounding mode of a given instruction and also to specify the Fused Universal Neural Network (FuNN) activation mode,
+; accumulation mode, or activate AND accumulate modes.  
+
+; Instruction bit field definitions common to both direct and indirect addressing modes:
+
+; RM[1:0] Directed Rounding Mode specifier for float results
+; mneumonic / 2-bit value
+; "_" = 00 = round using current "default" rounding direction, i.e., "nearest". Note: can be changed to "away" by setting bit 54 in the STATUS register 
+; "P" = 01 = round towards positive infinity
+; "N" = 10 = round towards negative infinity
+; "Z" = 11 = round towards zero
+; Note: the two RM bits of the instruction can be overridden by setting bit 53 (enable RM attributes) of the STATUS register.  If set, rounding mode attribute bits 51 and 52 of the STATUS register determine rounding direction.
+;
+; When the FuNN eNNgine or HedgeHog Fused Spiking Neural Network Emulator/Compute Engine is the destination operator, the two RM[1:0] bits become the 
+; Activate ("ACT") and Accumulate ("ACC") bits, respectively, when used individually on the assembly line, or "AA" when used together 
+;on the assembly line.  When the FuNN eNNgine is the destination the following mnemonics have the follwing meanings:
+;
+; "_"   = 00 = "default", meaning: perform sum of products with no activation and no accumulation on the tail end of pipeline.
+; "ACC" = 01 = ACCumulate mode, meaning:  perform sum of products and ADD the previous sum to arrive an accumulated sum, but with no activation.
+; "ACT" = 10 = ACTivate mode, meaning:  perform sum of products with no previous accumulation added to it, then activate using the activation function
+;              specified in bits 14 thru 11 in the Status Register (for more information, refer to the .pdf file at this repository with file name,
+;              "UFP_ISA.pdf".
+; "AA"  = 11 = activate mode and accumulate mode are both simultaneously specified for the instant instruction, thus perform the sum of products computation
+;              then ADD the previous sum to it, and then activate it with the previously specified activation function, then accumulate it.
+;
+; When the FuNN eNNgine is the destination operator, use the directed rounding attribute specifiers in the Status Regester for directed rounding.
+;
+; DAM[1:0] Data Access Mode pecifies from which memory the operand reads are to take place for the instant instruction
+; 00 = both operand A and operand B are read from data memory using either
+;      direct or indirect addressing modes
+; 01 = operand A is either direct or indirect and operand B is immediate (i.e, immediately available within instant instruction)
+; 10 = operand A is read from program memory using direct (table read from program memory) addressing modes 
+;      operand B is either direct or indirect and NEVER immediate
+; 11 = 32-bit immediate (i.e, immediately available within instant instruction)
+
+; SIGA  Signal for operandA meaning depends on context--either "s" or "_" must immediately precede Size field; can be mixed and matched
+;       can mean: "s" = 1 = signed (sign-extended); "_" = 0 = unsigned (zero-extended), depending on target operator
+;       can also mean: 1 = text (decimal character sequence); 0 = binary format (mainly used with direct character sequence computations/operators)
+;       implementor can make it mean anything he/she wants it to mean, depending on the target operator
+; SIGB for operandB meaning depends on context--either "s" or "_" must immediately precede Size field; can be mixed and matched
+;       can mean: "s" = 1 = signed (sign-extended); "_" = 0 = unsigned (zero-extended), depending on target operator
+;       can also mean: 1 = text (decimal character sequence); 0 = binary format (mainly used with direct character sequence computations/operators)
+;       implementor can make it mean anything he/she wants it to mean, depending on the target operator
+; SIGD for DEST meaning depends on context--either "s" or "_" must immediately precede Size field; can be mixed and matched
+;       can mean: "s" = 1 = signed (sign-extended) results; "_" = 0 = unsigned (zero-extended), depending on target operator
+;       can mean: 1 = eXchange ends (ie, flip endian-ness) on and during read of operand A, depending on context, for example, reading/writing from/to external memory versus on-chip memory
+;       can also mean: 1 = store results as text (decimal character sequence); 0 = binary format 
+;       can also mean: restore selected operator with value and flags being written
+;       implementor can make it mean anything he/she wants it to mean, depending on the target operator
+;
+; SIZ[2:0] Size in bytes, of source/destination (shown with SIGn bit cleared, i.e., immediately preceded with "_" character).
+; "_1:"   = 0 000 = 1 byte
+; "_2:"   = 0 001 = 2 bytes (half-word)
+; "_4:"   = 0 010 = 4 bytes (word)
+; "_8:"   = 0 011 = 8 bytes (double-word)
+; "_16:"  = 0 100 = 16 bytes (gob)--i.e, vector, structure and/or mix of types up to this byte count
+; "_32:"  = 0 101 = 32 bytes (gob)
+; "_64:"  = 0 110 = 64 bytes (gob)
+; "_128:" = 0 111 = 128 bytes (gob)
+;
+; SIZ[2:0] Size in bytes, of source/destination (shown with SIGn bit set, i.e., immediately preceded with "s" character).
+; "s1:"   = 1 000 = 1 byte
+; "s2:"   = 1 001 = 2 bytes (half-word)
+; "s4:"   = 1 010 = 4 bytes (word)
+; "s8:"   = 1 011 = 8 bytes (double-word)
+; "s16:"  = 1 100 = 16 bytes (gob)--i.e, vector, structure and/or mix of types up to this byte count
+; "s32:"  = 1 101 = 32 bytes (gob)
+; "s64:"  = 1 110 = 64 bytes (gob)
+; "s128:" = 1 111 = 128 bytes (gob)
+
+; IND 1 = indirect addressing mode for that field; 0 = direct addressing mode for that field
+;
+; IMOD is only used with IND = 1, meaning it is only used with indirect addressing mode for a given field
+; IMOD = 1 means: use signed AMOUNT field + ARn contents for effective address; ARn is not modified
+;
+;          for example,   _    _4:shft.0 = (_4:*AR2[32], RIGHT, 3)
+;                         _    _8:shft.0 = (_8:*AR1[-24], RIGHT, 3)
+
+; IMOD = 0 means: use ARn contents as pointer for read or write. Then automatically post-modify the contents
+;          of ARn by adding or subtracting UNsigned AMOUNT field to/from it.
+;           
+;          for exampl,    _    _4:shft.0 = (_4:*AR2++[8], RIGHT, 3)
+;                         _    _4:shft.1 = (_4:*AR1--[4], LEFT, 6)
+                          
+;--------------------------------------------------------------------------------
+;                  *Indirect Addressing Mode Instruction Format
+;                  note: indirect addressing mode can be mixed and matched with:
+;                         - indirect addressing mode (any combination)
+;                         - immediate addressing mode for srcB for dual operands
+;                         - immediate addressing mode for srcA for single operand
+;                         - table-read from program memory for srcA for dual operands
+;                         - table-read from program memory for srcA for single operand
+;                         - immediate data and table-read address modes may not appear on the same line
+;--------------------------------------------------------------------------------
+;             ____________________   ______________________   ______________________
+;            |        DEST        | |        srcA          | |         srcB         |
+;                    11111111112222 2 222 2 2 33333333334444 4 444 4 4 55555555556666                    
+;    01 23 4 567 8 9 01234567890123 4 567 8 9 01234567890123 4 567 8 9 01234567890123
+;    || || | ||| | | |_________||_| | ||| | | |_________||_| | ||| | | |_________||_|
+;    RR DD S SSS I I +/- AMOUNT *AR S SSS I I +/- AMOUNT *AR S SSS I I +/- AMOUNT *AR
+;    MM AA I III N M                I III N M                I III N M
+;    10 MM G ZZZ D O                G ZZZ D O                G ZZZ D O
+;       10 D 210   D                A 210   D                B 210   D
+;                  |____15-bit____|         |____15-bit____|         |____15-bit____|
+;                   DEST[dir addrs]          srcA[dir addrs]          srcB[dir addrs] 
+;                                         |________________|                 |______|
+;                                           @srcA[tabl adrs]             #srcB[8-bit]
+;                                                                  |________________|
+;                                                                       #srcB[16-bit]
+;                                               |___________________________________|
+;                                                    #srcB[32-bit immediate data]
+;
+;--------------------------------------------------------------------------------
+;                  Direct Addressing Mode Instruction Format
+;                  note:  direct addressing mode can be mixed and matched with:
+;                         - indirect addressing mode (any combination)
+;                         - immediate addressing mode for srcB for dual operands
+;                         - immediate addressing mode for srcA for single operand
+;                         - table-read from program memory for srcA for dual operands
+;                         - table-read from program memory for srcA for single operand
+;                         - immediate data and table-read address modes may not appear on the same line
+;--------------------------------------------------------------------------------
+;             ____________________   ______________________   ______________________
+;            |        DEST        | |        srcA          | |         srcB         |
+;                    11111111112222 2 222 2 2 33333333334444 4 444 4 4 55555555556666                    
+;    01 23 4 567 8 9 01234567890123 4 567 8 9 01234567890123 4 567 8 9 01234567890123
+;    || || | ||| | | |_________||_| | ||| | | |_________||_| | ||| | | |_________||_|
+;    RR DD S SSS I I +/- AMOUNT *AR S SSS I I +/- AMOUNT *AR S SSS I I +/- AMOUNT *AR
+;    MM AA I III N M                I III N M                I III N M
+;    10 MM G ZZZ D O                G ZZZ D O                G ZZZ D O
+;       10 D 210   D                A 210   D                B 210   D
+;                  |____15-bit____|         |____15-bit____|         |____15-bit____|
+;                   DEST[dir addrs]          srcA[dir addrs]          srcB[dir addrs] 
+;                                         |________________|                 |______|
+;                                           @srcA[tabl adrs]             #srcB[8-bit]
+;                                                                  |________________|
+;                                                                       #srcB[16-bit]
+;                                               |___________________________________|
+;                                                    #srcB[32-bit immediate data]
+;
+;--------------------------------------------------------------------------------
+;                  #Immediate Addressing Mode Instruction Format
+;                  note: immediate addressing mode may not be used with table-read
+;                        addressing mode on the same line
+;--------------------------------------------------------------------------------
+;             ____________________   ______________________   ____________________
+;            |        DEST        | |        srcA          | |        srcB        |
+;                    11111111112222 2 222 2 2 33333333334444 4 444 4455555555556666                    
+;    01 23 4 567 8 9 01234567890123 4 567 8 9 01234567890123 4 567 8901234567890123
+;    || || | ||| | | |_________||_| | ||| | | |_________||_| | |||         |______| 
+;    RR DD S SSS I I +/- AMOUNT *AR S SSS I I +/- AMOUNT *AR S SSS     #srcB[8-bit] 
+;    MM AA I III N M                I III N M                I III |______________|
+;    10 MM G ZZZ D O                G ZZZ D O                G ZZZ    #srcB[16-bit]
+;       10 D 210   D                A 210   D                B 210 
+;                  |____15-bit____|         |____15-bit____|         
+;                   DEST[dir addrs]          srcA[dir addrs]           
+;                                                                  
+;                                               |_________________________________|                   
+;                                                   #srcB[32-bit immediate data]                   
+;                                                 
+;--------------------------------------------------------------------------------
+;            @Table-Read from Program Memory Addressing Mode Instruction Format
+;            note: Table-Read addressing mode may not be used with immediate
+;                  addressing mode on the same line
+;                  srcB can be direct or indirect address mode
+;--------------------------------------------------------------------------------
+;             ____________________   ____________________   ______________________
+;            |       DEST         | |        srcA        | |         srcB         |
+;                    11111111112222 2 222 2233333333334444 4 444 4 4 55555555556666                    
+;    01 23 4 567 8 9 01234567890123 4 567 8901234567890123 4 567 8 9 01234567890123
+;    || || | ||| | | |_________||_| | ||| |______________| | ||| | | |_________||_|
+;    RR DD S SSS I I +/- AMOUNT *AR S SSS @srcA[tabl adrs] S SSS I I +/- AMOUNT *AR
+;    MM AA I III N M                I III                  I III N M
+;    10 MM G ZZZ D O                G ZZZ                  G ZZZ D O
+;       10 D 210   D                A 210                  B 210   D
+;                  |____15-bit____|                                |____15-bit____|
+;                   DEST[dir addrs]                                  srcB[dir addrs] 
+;                                                          
+;                                               
+;                                             
+;--------------------------------------------------------------------------------
+;                  Shift Operator Input Format 
+;                  note: shifts the specified data the specified number of times
+;                        using the specified shift mode.  it affects C, Z and N 
+;                        when the result is read out of the specified (1 of 16)
+;                        result buffers.  
+;--------------------------------------------------------------------------------
+;           ______________________   ______________________   _____________________           Shift
+;          |        DEST          | |        srcA          | |        srcB         |     Code Type 
+;                    11111111112222 2 222 2 2 33333333334444 444444 55555 555556 666     ------------               
+;    01 23 4 567 8  901234567890123 4 567 8 9 01234567890123 456789 01234 567890 123     000 | LEFT 
+;    || || | ||| |                  | ||| | | |_________||_| xxxxxx |___| xxxxxx |_|     001 | LSL  
+;    RR DD S SSS I                  S SSS I I +/- AMOUNT *AR        #Bits        Shift   010 | COPY  
+;    MM AA I III N                  I III N M                                     Type   011 | ROL
+;    10 MM G ZZZ D  |___15-bit____| G ZZZ D O                                            100 | RIGHT
+;       10 D 210    DEST[dir addrs] A 210   D                                            101 | LSR  
+;                                           |____15-bit____|                             110 | ASR  
+;                                            srcA[dir addrs]                             111 | ROR  
+;                                         |________________|                            
+;                                           @srcA[tabl adrs]      
+;                                                                 
+;                  
+;--------------------------------------------------------------------------------
+;                  Bit Test and Branch (if Set) Operator Input Format 
+;                  note: test bit# of srcA with bit# specified in srcB
+;                        if set, then load PC with relative +/- displacement 
+;                        srcA can be direct or indirect address mode
+;                        range is -4096 to +4095 instructions specified in srcB 
+;--------------------------------------------------------------------------------
+;           _____________________   ______________________   ___________________
+;          |        DEST         | |        srcA          | |       srcB        |
+;                   11111111112222 2 222 2 2 33333333334444 444444 55555555556666                    
+;    01 23 4 567 8 901234567890123 4 567 8 9 01234567890123 456789 01234567890123
+;    || || | ||| |                 | ||| | | |_________||_| |____| |____________|
+;    RR DD S SSS I                 S SSS I I +/- AMOUNT *AR  Bit#   Displacement 
+;    MM AA I III N |___15-bit____| I III N M                       -8192 to +8191 
+;    10 MM G ZZZ D DEST[dir addrs] G ZZZ D O                            
+;       10 D 210                   A 210   D                        
+;                                          |____15-bit____| 
+;                                           srcA[dir addrs]      
+;                                        |________________|      
+;                                          @srcA[tabl adrs]      
+;                                                                                                                            
+;--------------------------------------------------------------------------------
+;                  Bit Test and Branch (if Clear) Instruction 
+;                  note: test bit# of srcA with bit# specified in srcB
+;                        if clear, then load PC with relative +/- displacement 
+;                        srcA can be direct or indirect address mode
+;                        range is -4096 to +4095 instructions specified in srcB 
+;--------------------------------------------------------------------------------
+;           _____________________   ______________________   ___________________
+;          |        DEST         | |        srcA          | |       srcB        |
+;                   11111111112222 2 222 2 2 33333333334444 444444 55555555556666                    
+;    01 23 4 567 8 901234567890123 4 567 8 9 01234567890123 456789 01234567890123
+;    || || | ||| |                 | ||| | | |_________||_| |____| |____________|
+;    RR DD S SSS I                 S SSS I I +/- AMOUNT *AR  Bit#   Displacement  
+;    MM AA I III N |___15-bit____| I III N M                       -8192 to +8191  
+;    10 MM G ZZZ D DEST[dir addrs] G ZZZ D O                            
+;       10 D 210                   A 210   D                        
+;                                          |____15-bit____| 
+;                                           srcA[dir addrs]      
+;                                        |________________|      
+;                                          @srcA[tabl adrs]      
+;                                                                                                                            
+;-----------------------------------------------------------------------------------
+;                  (Long) Branch Instruction 
+;                  note: unconditional branch relative
+;                        load PC with relative +/- displacement                                              
+;                        srcB can be direct or indirect address mode                                         
+;                        range is -2147483648 to +2147483647 from Branch instruction                         
+;-----------------------------------------------------------------------------------                         
+;           ______________________   _______________________   ______________________
+;          |        DEST          | |        srcA           | |         srcB         |
+;                    11111111112222 2 222 2 2 33 333333334444 4 444 4 4 55555555556666                    
+;    01 23 4 567 8  901234567890123 4 567 8 9 01 234567890123 4 567 8 9 01234567890123
+;    || || | ||| |                  | ||| 0 0 00 |___________________________________|
+;    RR DD S SSS I                  S SSS                   #srcB[32-bit]           
+;    MM AA I III N |______________| I III 
+;    10 MM G ZZZ D  DEST[dir addrs] G ZZZ 
+;       10 D 210                    A 210 
+;                                         
+;           
+;                           
+;
+;
+;                                                                                                                  
+;---------------------------------                                                                              
+;Register/Flag definition section                                                                               
+;---------------------------------                                                                              
+1, "LEFT", "LSL", "COPY", "ROL", "RIGHT", "LSR", "ASR", "ROR"   ;type of SHFT                                       
+2, "AR0", "AR1", "AR2", "AR3", "AR4", "AR5", "AR6", "SP"                                                           
+;---------------------------
+;Operand definition section
+;---------------------------
+*
+;NUM	START	LENGTH     EXP         LOW         HIGH       ;COMMENT
+1,	      9,	  15,       #,          0,       0x7FFF       ;direct destination
+2,	     29,      15,       #,          0,       0x7FFF       ;direct SrcA
+3,       49,      15,       #,          0,       0x7FFF       ;direct SrcB
+
+4,       21,	   3,      @2,         0x0,         0x7       ;indirect destination  
+5,       41,       3,      @2,         0x0,         0x7       ;indirect SrcA  
+6,       61,       3,      @2,         0x0,         0x7       ;indirect SrcB 
+
+7,       56,      8,        #,         0x0,        0xFF       ;immediate MOV #8-bits  {srcB} combined
+8,       48,      16,       #,         0x0,      0xFFFF       ;immediate MOV #16-bits {srcB} combined
+9,       32,      32,       #,  0x80000000,  0x7FFFFFFF       ;immediate MOV #32-bits {srcA,srcB} combined
+
+10,      50,      14,   {#-$},      $-8192,      $+8191       ;relative branch
+11,      44,       6,       #,           0,          63       ;bit number for btbs/c instructions
+;11,      44,       6,       #,           0,          127       ;bit number for btbs/c instructions
+
+12,      61,       3,      @1,           0,         0x7       ;shift type
+
+13,      24,       4,       #,           0,         0xF       ;operandA sign-extend and size
+14,      44,       4,       #,           0,         0xF       ;operandB sign-extend and size
+
+;15,      50,       5,       #,           0,          31       ;shift amount
+15,      50,       5,       #-1,          1,          32       ;shift amount
+
+16,      10,      11,       #,       -1024,       +1023       ;indirect destination offset e.g., *AR1[-20]
+17,      10,      11,       #,           0,        1023       ;indirect destination with automatic ARn post-increment by specified amount e.g., *AR3++[4]
+18,      10,      11,   {0-#},           0,        1024       ;indirect destination with automatic ARn post-decrement by specified amount e.g., *AR3--[8]
+
+19,      30,      11,       #,       -1024,       +1023       ;indirect srcA offset e.g., *AR1[-20]
+20,      30,      11,       #,           0,        1023       ;indirect srcA with automatic ARn post-increment by specified amount e.g., *AR3++[4]
+21,      30,      11,   {0-#},           0,        1024       ;indirect srcA with automatic ARn post-decrement by specified amount e.g., *AR3--[8]
+
+22,      50,      11,       #,       -1024,       +1023       ;indirect srcA offset e.g., *AR1[-20]
+23,      50,      11,       #,           0,        1023       ;indirect srcB with automatic ARn post-increment by specified amount e.g., *AR3++[4]
+24,      50,      11,   {0-#},           0,        1024       ;indirect srcB with automatic ARn post-decrement by specified amount e.g., *AR3--[8]
+
+25,      32,      32,   {#-$},  0x80000000,  0x7FFFFFFF       ;relative long branch
+
+26,      4,       4,       #,           0,         0xF       ;destination sign-extend and size
+
+ 
+*
+;--------------------------------------------------------------------------------------------
+; Conventional "MOV" assembly language formatings 
+;--------------------------------------------------------------------------------------------
+
+  1,{26}:{1}={13}:#{9}^3000000000000000:
+  2,{26}:*{4}[{16}]={13}:#{9}^30C0000000000000:
+  3,{26}:*{4}++[{17}]={13}:#{9}^3080000000000000:
+  4,{26}:*{4}--[{18}]={13}:#{9}^3080000000000000:
+  5,{26}:{1}={13}:{2}^0000000000000000:
+  6,{26}:{1}={13}:*{5}[{19}]^0000000C00000000:
+  7,{26}:{1}={13}:*{5}++[{20}]^0000000800000000:
+  8,{26}:{1}={13}:*{5}--[{21}]^0000000800000000:
+  9,{26}:*{4}[{16}]={13}:{2}^00C0000000000000:
+ 10,{26}:*{4}[{16}]={13}:*{5}[{19}]^00C0000C00000000:
+ 11,{26}:*{4}[{16}]={13}:*{5}++[{20}]^00C0000800000000:
+ 12,{26}:*{4}[{16}]={13}:*{5}--[{21}]^00C0000800000000:
+ 13,{26}:*{4}++[{17}]={13}:{2}^0080000000000000:
+ 14,{26}:*{4}++[{17}]={13}:*{5}[{19}]^0080000C00000000:
+ 15,{26}:*{4}++[{17}]={13}:*{5}++[{20}]^0080000800000000:
+ 16,{26}:*{4}++[{17}]={13}:*{5}--[{21}]^0080000800000000:
+ 17,{26}:*{4}--[{18}]={13}:{2}^0080000000000000:
+ 18,{26}:*{4}--[{18}]={13}:*{5}[{19}]^0080000C00000000:
+ 19,{26}:*{4}--[{18}]={13}:*{5}++[{20}]^0080000800000000:
+ 20,{26}:*{4}--[{18}]={13}:*{5}--[{21}]^0080000800000000:
+ 21,{26}:{1}={13}:@{2}^2000000000000000:
+ 22,{26}:*{4}[{16}]={13}:@{2}^20C0000000000000:
+ 23,{26}:*{4}++[{17}]={13}:@{2}^2080000000000000:
+ 24,{26}:*{4}--[{18}]={13}:@{2}^2080000000000000:
+ 25,{26}:{1}={13}:@{2}^2000000000000000:
+ 26,{26}:*{4}[{16}]={13}:@{2}^20C0000000000000:
+ 27,{26}:*{4}++[{17}]={13}:@{2}^2080000000000000:
+ 28,{26}:*{4}--[{18}]={13}:@{2}^2080000000000000:
+ 29,{26}:{1}={13}:{2}^0000000000000000:
+ 30,{26}:{1}={13}:*{5}[{19}]^0000000C00000000:
+ 31,{26}:{1}={13}:*{5}++[{20}]^0000000800000000:
+ 32,{26}:{1}={13}:*{5}--[{21}]^0000000800000000:
+ 33,{26}:*{4}[{16}]={13}:{2}^00C0000000000000:
+ 34,{26}:*{4}[{16}]={13}:*{5}[{19}]^00C0000C00000000:
+ 35,{26}:*{4}[{16}]={13}:*{5}++[{20}]^00C0000800000000:
+ 36,{26}:*{4}[{16}]={13}:*{5}--[{21}]^00C0000800000000:
+ 37,{26}:*{4}++[{17}]={13}:{2}^0080000000000000:
+ 38,{26}:*{4}++[{17}]={13}:*{5}[{19}]^0080000C00000000:
+ 39,{26}:*{4}++[{17}]={13}:*{5}++[{20}]^0080000800000000:
+ 40,{26}:*{4}++[{17}]={13}:*{5}--[{21}]^0080000800000000:
+ 41,{26}:*{4}--[{18}]={13}:{2}^0080000000000000:
+ 42,{26}:*{4}--[{18}]={13}:*{5}[{19}]^0080000800000000:
+ 43,{26}:*{4}--[{18}]={13}:*{5}++[{20}]^0080000000000000:
+ 44,{26}:*{4}--[{18}]={13}:*{5}--[{21}]^0080000000000000:
+ 45,{26}:{1},{13}:@{2}={14}:{3}^2000000000000000:
+ 46,{26}:{1},{13}:@{2}={14}:*{6}[{22}]^200000000000C000:
+ 47,{26}:{1},{13}:@{2}={14}:*{6}++[{23}]^2000000000008000:
+ 48,{26}:{1},{13}:@{2}={14}:*{6}--[{24}]^2000000000008000:  
+ 
+ 49,{26}:*{4}[{16}]=({13}:@{2},{14}:{3})^20C0000000000000:  
+ 50,{26}:*{4}[{16}]=({13}:@{2},{14}:*{6}[{22}])^20C000000000C000:
+ 51,{26}:*{4}[{16}]=({13}:@{2},{14}:*{6}++[{23}])^20C0000000008000:
+ 52,{26}:*{4}[{16}]=({13}:@{2},{14}:*{6}--[{24}])^20C0000000008000:
+ 53,{26}:*{4}++[{17}]=({13}:@{2},{14}:{3})^2080000000000000:
+ 54,{26}:*{4}++[{17}]=({13}:@{2},{14}:*{6}[{22}])^208000000000C000:
+ 55,{26}:*{4}++[{17}]=({13}:@{2},{14}:*{6}++[{23}])^2080000000008000:
+ 56,{26}:*{4}++[{17}]=({13}:@{2},{14}:*{6}--[{24}])^2080000000008000:
+ 57,{26}:*{4}--[{18}]=({13}:@{2},{14}:{3})^2080000000000000:
+ 58,{26}:*{4}--[{18}]=({13}:@{2},{14}:*{6}[{22}])^208000000000C000:
+ 59,{26}:*{4}--[{18}]=({13}:@{2},{14}:*{6}++[{23}])^2080000000008000:
+ 60,{26}:*{4}--[{18}]=({13}:@{2},{14}:*{6}--[{24}])^2080000000008000:
+ 61,{26}:{1}=({13}:{2},{14}:#{8})^1000000000000000:
+ 62,{26}:{1}=({13}:*{5}[{19}],{14}:#{8})^1000000800000000:
+ 63,{26}:{1}=({13}:*{5}++[{20}],{14}:#{8})^1000000000000000:
+ 64,{26}:{1}=({13}:*{5}--[{21}],{14}:#{8})^1000000000000000:
+ 65,{26}:*{4}[{16}]=({13}:{2},{14}:#{8})^10C0000000000000:
+ 66,{26}:*{4}[{16}]=({13}:*{5}[{19}],{14}:#{8})^10C0000C00000000:
+ 67,{26}:*{4}[{16}]=({13}:*{5}++[{20}],{14}:#{8})^10C0000800000000:
+ 68,{26}:*{4}[{16}]=({13}:*{5}--[{21}],{14}:#{8})^10C0000800000000:
+ 69,{26}:*{4}++[{17}]=({13}:{2},{14}:#{8})^1080000000000000:
+ 70,{26}:*{4}++[{17}]=({13}:*{5}[{19}],{14}:#{8})^1080000C00000000:
+ 71,{26}:*{4}++[{17}]=({13}:*{5}++[{20}],{14}:#{8})^1080000800000000:
+ 72,{26}:*{4}++[{17}]=({13}:*{5}--[{21}],{14}:#{8})^1080000800000000:
+ 73,{26}:*{4}--[{18}]=({13}:{2},{14}:#{8})^1080000000000000:
+ 74,{26}:*{4}--[{18}]=({13}:*{5}[{19}],{14}:#{8})^1080000C00000000:
+ 75,{26}:*{4}--[{18}]=({13}:*{5}++[{20}],{14}:#{8})^1080000800000000:
+ 76,{26}:*{4}--[{18}]=({13}:*{5}--[{21}],{14}:#{8})^1080000800000000:
+ 77,{26}:{1}=({13}:{2},{14}:{3})^0000000000000000:
+ 78,{26}:{1}=({13}:{2},{14}:*{6}[{22}])^000000000000C000:
+ 79,{26}:{1}=({13}:{2},{14}:*{6}++[{23}])^0000000000008000:
+ 80,{26}:{1}=({13}:{2},{14}:*{6}--[{24}])^0000000000008000:
+ 81,{26}:{1}=({13}:*{5}[{19}],{14}:{3})^0000000C00000000:
+ 82,{26}:{1}=({13}:*{5}[{19}],{14}:*{6}[{22}])^0000000C00008000:
+ 83,{26}:{1}=({13}:*{5}[{19}],{14}:*{6}++[{23}])^0000000C00000000:
+ 84,{26}:{1}=({13}:*{5}[{19}],{14}:*{6}--[{24}])^0000000C00000000:
+ 85,{26}:{1}=({13}:*{5}++[{20}],{14}:{3})^0000000800000000:
+ 86,{26}:{1}=({13}:*{5}++[{20}],{14}:*{6}[{22}])^000000080000C000:
+ 87,{26}:{1}=({13}:*{5}++[{20}],{14}:*{6}++[{23}])^0000000800008000:
+ 88,{26}:{1}=({13}:*{5}++[{20}],{14}:*{6}--[{24}])^0000000800008000:
+ 89,{26}:{1}=({13}:*{5}--[{21}],{14}:{3})^0000000800000000:
+ 90,{26}:{1}=({13}:*{5}--[{21}],{14}:*{6}[{22}])^000000080000C000:
+ 91,{26}:{1}=({13}:*{5}--[{21}],{14}:*{6}++[{23}])^0000000800008000:
+ 92,{26}:{1}=({13}:*{5}--[{21}],{14}:*{6}--[{24}])^0000000800008000:
+ 93,{26}:*{4}[{16}]=({13}:{2},{14}:{3})^0080000000000000:
+ 94,{26}:*{4}[{16}]=({13}:{2},{14}:*{6}[{22}])^00C000000000C000:
+ 95,{26}:*{4}[{16}]=({13}:{2},{14}:*{6}++[{23}])^00C0000000008000:
+ 96,{26}:*{4}[{16}]=({13}:{2},{14}:*{6}--[{24}])^00C0000000008000:
+ 97,{26}:*{4}[{16}]=({13}:*{5}[{19}],{14}:{3})^00C0000C00000000:
+ 98,{26}:*{4}[{16}]=({13}:*{5}[{19}],{14}:*{6}[{22}])^00C0000C0000C000:
+ 99,{26}:*{4}[{16}]=({13}:*{5}[{19}],{14}:*{6}++[{23}])^00C0000C00008000:
+100,{26}:*{4}[{16}]=({13}:*{5}[{19}],{14}:*{6}--[{24}])^00C0000C00008000:
+101,{26}:*{4}[{16}]=({13}:*{5}++[{20}],{14}:{3})^00C0000800000000:
+102,{26}:*{4}[{16}]=({13}:*{5}++[{20}],{14}:*{6}[{22}])^00C000080000C000:
+103,{26}:*{4}[{16}]=({13}:*{5}++[{20}],{14}:*{6}++[{23}])^00C0000800008000:
+104,{26}:*{4}[{16}]=({13}:*{5}++[{20}],{14}:*{6}--[{24}])^00C0000800008000:
+105,{26}:*{4}[{16}]=({13}:*{5}--[{21}],{14}:{3})^00C0000800000000:
+106,{26}:*{4}[{16}]=({13}:*{5}--[{21}],{14}:*{6}[{22}])^00C000080000C000:
+107,{26}:*{4}[{16}]=({13}:*{5}--[{21}],{14}:*{6}++[{23}])^00C0000800008000:
+108,{26}:*{4}[{16}]=({13}:*{5}--[{21}],{14}:*{6}--[{24}])^00C0000800008000:
+109,{26}:*{4}++[{17}]=({13}:{2},{14}:{3})^0080000000000000:                                                                          
+110,{26}:*{4}++[{17}]=({13}:{2},{14}:*{6}[{22}])^008000000000C000:                                                                   
+111,{26}:*{4}++[{17}]=({13}:{2},{14}:*{6}++[{23}])^0080000000008000:                                                                 
+112,{26}:*{4}++[{17}]=({13}:{2},{14}:*{6}--[{24}])^0080000000008000:                                                                 
+113,{26}:*{4}++[{17}]=({13}:*{5}[{19}],{14}:{3})^0080000C00000000:                                                                   
+114,{26}:*{4}++[{17}]=({13}:*{5}[{19}],{14}:*{6}[{22}])^0080000C0000C000:                                                            
+115,{26}:*{4}++[{17}]=({13}:*{5}[{19}],{14}:*{6}++[{23}])^0080000C00008000:                                                          
+116,{26}:*{4}++[{17}]=({13}:*{5}[{19}],{14}:*{6}--[{24}])^0080000C00008000:                                                          
+117,{26}:*{4}++[{17}]=({13}:*{5}++[{20}],{14}:{3})^0080000800000000:                                                                 
+118,{26}:*{4}++[{17}]=({13}:*{5}++[{20}],{14}:*{6}[{22}])^008000080000C000:                                                          
+119,{26}:*{4}++[{17}]=({13}:*{5}++[{20}],{14}:*{6}++[{23}])^0080000800008000:                                                        
+120,{26}:*{4}++[{17}]=({13}:*{5}++[{20}],{14}:*{6}--[{24}])^0080000800008000:                                                        
+121,{26}:*{4}++[{17}]=({13}:*{5}--[{21}],{14}:{3})^0080000800000000:                                                                 
+122,{26}:*{4}++[{17}]=({13}:*{5}--[{21}],{14}:*{6}[{22}])^008000080000C000:                                                          
+123,{26}:*{4}++[{17}]=({13}:*{5}--[{21}],{14}:*{6}++[{23}])^0080000800008000:                                                        
+124,{26}:*{4}++[{17}]=({13}:*{5}--[{21}],{14}:*{6}--[{24}])^0080000800008000:                                                        
+125,{26}:*{4}--[{18}]=({13}:{2},{14}:{3})^0080000000000000:                                                                          
+126,{26}:*{4}--[{18}]=({13}:{2},{14}:*{6}[{22}])^008000000000C000:                                                                   
+127,{26}:*{4}--[{18}]=({13}:{2},{14}:*{6}++[{23}])^0080000000008000:                                                                 
+128,{26}:*{4}--[{18}]=({13}:{2},{14}:*{6}--[{24}])^0080000000008000:                                                                 
+129,{26}:*{4}--[{18}]=({13}:*{5}[{19}],{14}:{3})^0080000C00000000:                                                                   
+130,{26}:*{4}--[{18}]=({13}:*{5}[{19}],{14}:*{6}[{22}])^0080000C0000C000:                                                            
+131,{26}:*{4}--[{18}]=({13}:*{5}[{19}],{14}:*{6}++[{23}])^0080000C00008000:                                                          
+132,{26}:*{4}--[{18}]=({13}:*{5}[{19}],{14}:*{6}--[{24}])^0080000C00008000:                                                          
+133,{26}:*{4}--[{18}]=({13}:*{5}++[{20}],{14}:{3})^0080000800000000:                                                                 
+134,{26}:*{4}--[{18}]=({13}:*{5}++[{20}],{14}:*{6}[{22}])^008000080000C000:                                                          
+135,{26}:*{4}--[{18}]=({13}:*{5}++[{20}],{14}:*{6}++[{23}])^0080000800008000:                                                        
+136,{26}:*{4}--[{18}]=({13}:*{5}++[{20}],{14}:*{6}--[{24}])^0080000800008000:                                                        
+137,{26}:*{4}--[{18}]=({13}:*{5}--[{21}],{14}:{3})^0080000800000000:                                                                 
+138,{26}:*{4}--[{18}]=({13}:*{5}--[{21}],{14}:*{6}[{22}])^008000080000C000:                                                          
+139,{26}:*{4}--[{18}]=({13}:*{5}--[{21}],{14}:*{6}++[{23}])^0080000800008000:                                                        
+140,{26}:*{4}--[{18}]=({13}:*{5}--[{21}],{14}:*{6}--[{24}])^0080000800008000:   
+
+141,{26}:{1}=({13}:{2},{12},{15})^1000000000000000:                              ;SHIFT operator pre-formatting 
+142,{26}:{1}=({13}:*{5}[{19}],{12},{15})^1000000C00000000:
+143,{26}:{1}=({13}:*{5}++[{20}],{12},{15})^1000000800000000:
+144,{26}:{1}=({13}:*{5}--[{21}],{12},{15})^1000000800000000:
+145,{26}:*{4}[{16}]=({13}:{2},{12},{15})^10C0000000000000:
+146,{26}:*{4}[{16}]=({13}:*{5}[{19}],{12},{15})^10C0000C00000000:
+147,{26}:*{4}[{16}]=({13}:*{5}++[{20}],{12},{15})^10C0000800000000:                      
+148,{26}:*{4}[{16}]=({13}:*{5}--[{21}],{12},{15})^10C0000800000000:                      
+149,{26}:*{4}++[{17}]=({13}:{2},{12},{15})^1080000000000000:                    
+150,{26}:*{4}++[{17}]=({13}:*{5}[{19}],{12},{15})^1080000C00000000:                    
+151,{26}:*{4}++[{17}]=({13}:*{5}++[{20}],{12},{15})^1080000800000000:
+152,{26}:*{4}++[{17}]=({13}:*{5}--[{21}],{12},{15})^1080000800000000:
+153,{26}:*{4}--[{18}]=({13}:{2},{12},{15})^1080000000000000:
+154,{26}:*{4}--[{18}]=({13}:*{5}[{19}],{12},{15})^1080000C00000000:
+155,{26}:*{4}--[{18}]=({13}:*{5}++[{20}],{12},{15})^1080000800000000:
+156,{26}:*{4}--[{18}]=({13}:*{5}--[{21}],{12},{15})^1080000800000000:    
+
+157,{26}:{1}=({13}:{2},{11},{10})^1000000000000000:                              ;Bit test and branch operator pre-formatting
+158,{26}:{1}=({13}:*{5}[{19}],{11},{10})^1000000C00000000:
+159,{26}:{1}=({13}:*{5}++[{20}],{11},{10})^1000000800000000:
+160,{26}:{1}=({13}:*{5}--[{21}],{11},{10})^1000000800000000:
+
+161,^0000000000000000:
+ 
+* ;Mnemonic Definition section.  "_" means use default rounding direction; "P" round towards pos infinity; "N" round towards negative infinity; "Z" truncate
+
+_|1-161^0000000000000000:
+P|1-160^4000000000000000:
+N|1-160^8000000000000000:
+Z|1-160^C000000000000000:
+ACC|1-160^4000000000000000:  //accumulate
+ACT|1-160^8000000000000000:  //activate
+AA|1-160^C000000000000000:   //activate and accumulate
+
+
+
+* ;equates section
+;-----------------------------------------------------------------------------
+;   Activation Mode Specifiers
+;-----------------------------------------------------------------------------
+ident:      EQU  0
+SQNL:       EQU  1
+ReLU:       EQU  2
+LReLU:      EQU  3
+HardTan:    EQU  4
+SQ_RBF:     EQU  5
+Exp:        EQU  6
+TanH:       EQU  7
+SoftStep:   EQU  8
+Logistic:   EQU  8
+SoftPlus:   EQU  9
+Gaussian:   EQU  10
+SoftMax:    EQU  11
+HardMax:    EQU  12
+
+;-----------------------------------------------------------------------------
+;   Data type/size specifiers for SOURCE operands A and B and DESTINATION
+;-----------------------------------------------------------------------------
+
+_1:          EQU     0x0        ;read cycle with SIGn bit clear       
+_2:          EQU     0x1        ;read cycle with SIGn bit clear       
+_4:          EQU     0x2        ;read cycle with SIGn bit clear       
+_8:          EQU     0x3        ;read cycle with SIGn bit clear       
+_16:         EQU     0x4        ;read cycle with SIGn bit clear       
+_32:         EQU     0x5        ;read cycle with SIGn bit clear       
+_64:         EQU     0x6        ;read cycle with SIGn bit clear       
+_128:        EQU     0x7        ;read cycle with SIGn bit clear       
+
+s1:          EQU     0x8        ;read cycle with SIGn bit set
+s2:          EQU     0x9        ;read cycle with SIGn bit set
+s4:          EQU     0xA        ;read cycle with SIGn bit set
+s8:          EQU     0xB        ;read cycle with SIGn bit set
+s16:         EQU     0xC        ;read cycle with SIGn bit set
+s32:         EQU     0xD        ;read cycle with SIGn bit set
+s64:         EQU     0xE        ;read cycle with SIGn bit set
+s128:        EQU     0xF        ;read cycle with SIGn bit set
+
+
+;--------------------------------------------------------------------------           
+;         internal memory-mapped h/w registers
+;--------------------------------------------------------------------------
+
+SP_TOS:      EQU     0x7FFF     ;reading this location will return the contents at the top of stack without affecting SP
+SP:          EQU     0x7FFE     ;stack pointer
+AR6:         EQU     0x7FFD     ;Auxiliary Reg 6
+AR5:         EQU     0x7FFC     ;Auxiliary Reg 5
+AR4:         EQU     0x7FFB     ;Auxiliary Reg 4
+AR3:         EQU     0x7FFA     ;Auxiliary Reg 3
+AR2:         EQU     0x7FF9     ;Auxiliary Reg 2
+AR1:         EQU     0x7FF8     ;Auxiliary Reg 1
+AR0:         EQU     0x7FF7     ;Auxiliary Reg 0
+PC_REL:      EQU     0x7FF6     ;load PC with unconditional 32-bit relative branch value
+PC:          EQU     0x7FF5     ;Program Counter
+PCS:         EQU     0x7FF4     ;conditional load PC "set" with 13-bit relative branch value
+PCC:         EQU     0x7FF3     ;conditional load PC "clear" with 13-bit relative branch value
+PC_COPY:     EQU     0x7FF2     ;anytime a PC discontinuity happens, a copy of the original is automatically placed here
+STATUS:      EQU     0x7FF1     ;Status Register
+PRNG:        EQU     0x7FF0     ;pseudo-random number generator
+REPEAT:      EQU     0x7FEF     ;repeat counter location
+LPCNT1:      EQU     0x7FEE     ;H/W loop counter 1
+LPCNT0:      EQU     0x7FED     ;H/W loop counter 0
+TIMER:       EQU     0x7FEC     ;timer
+MONITR_REG:  EQU     0x7FEB
+                    
+SCHEDULER:   EQU     0x7FEA     ;for interleaving multithreading version
+SCHEDCMP:    EQU     0x7FE9
+
+SPARE_VEC1:  EQU     0x7FE8                                      
+SPARE_VEC0:  EQU     0x7FE7                                      
+NMI_VECT:    EQU     0x7FE6                                      
+IRQ_VECT:    EQU     0x7FE5                                      
+INV_VECT:    EQU     0x7FE4                                      
+DIVx0_VECT:  EQU     0x7FE3
+OVFL_VECT:   EQU     0x7FE2
+UNFL_VECT:   EQU     0x7FE1
+INEXT_VECT:  EQU     0x7FE0
+
+XCU_C_R:     EQU     0x7FDF     ;r/w  XCU_CONTROL_REGISTER
+XCU_S_R:     EQU     0x7FDE     ;r/w  XCU_STATUS_REGISTER
+                          
+CAPTURE3:    EQU     0x7FDD     ;alternate delayed exception capture register 3
+CAPTURE2:    EQU     0x7FDC     ;alternate delayed exception capture register 2
+CAPTURE1:    EQU     0x7FDB     ;alternate delayed exception capture register 1
+CAPTURE0:    EQU     0x7FDA     ;alternate delayed exception capture register 0
+
+savAllFlags: EQU     0x7FD9     ;reading this location will return all flags
+sgtBinRnDir: EQU     0x7FD8     ;read/write this location to get/set current rounding direction here
+savedModes:  EQU     0x7FD7     ;savedModes should be the destination of the sgtBinRnDir operation
+class:       EQU     0x7FD6     ;write/read here to get encoded class
+radix:       EQU     0x7FD5     ;read this location to get 0x02
+
+compare:     EQU     0x7FCF     ;integer compare address (size of destination must be 2'b00, ie, byte)
+tstSavFlg:   EQU     0x7FCE     ;test "saved" flags 
+actMode:     EQU     0x7FCD     ;neural network activation mode                     
+
+cmpSE:       EQU     0x7CFF     ;cmpSE  byte address compareSignalingEqual(source1, source2)           
+cmpQE:       EQU     0x7CFE     ;cmpQE   byte address compareQuietEqual(source1, source2)               
+cmpSNE:      EQU     0x7CFD     ;cmpSNE  byte address compareSignalingNotEqual(source1, source2)        
+cmpQNE:      EQU     0x7CFC     ;cmpQNE  byte address compareQuietNotEqual(source1, source2)            
+cmpSG:       EQU     0x7CFB     ;cmpSG  byte address compareSignalingGreater(source1, source2)         
+cmpQG:       EQU     0x7CFA     ;cmpQG  byte address compareQuietGreater(source1, source2)             
+cmpSGE:      EQU     0x7CF9     ;cmpSGE  byte address compareSignalingGreaterEqual(source1, source2)    
+cmpQGE:      EQU     0x7CF8     ;cmpQGE  byte address compareQuietGreaterEqual(source1, source2)        
+cmpSL:       EQU     0x7CF7     ;cmpSL  byte address compareSignalingLess(source1, source2)            
+cmpQL:       EQU     0x7CF6     ;cmpQL  byte address compareQuietLess(source1, source2)                
+cmpSLE:      EQU     0x7CF5     ;cmpSLE  byte address compareSignalingLessEqual(source1, source2)       
+cmpQLE:      EQU     0x7CF4     ;cmpQLE  byte address compareQuietLessEqual(source1, source2)           
+cmpSNG:      EQU     0x7CF3     ;cmpSNG  byte address compareSignalingNotGreater(source1, source2)      
+cmpQNG:      EQU     0x7CF2     ;cmpQNG  byte address compareQuietNotGreater(source1, source2)          
+cmpSLU:      EQU     0x7CF1     ;cmpSLU  byte address compareSignalingLessUnordered(source1, source2)   
+cmpQLU:      EQU     0x7CF0     ;cmpQLU  byte address compareQuietLessUnordered(source1, source2)       
+cmpSNL:      EQU     0x7CEF     ;cmpSNL  byte address compareSignalingNotLess(source1, source2)         
+cmpQNL:      EQU     0x7CEE     ;cmpQNL  byte address compareQuietNotLess(source1, source2)             
+cmpSGU:      EQU     0x7CED     ;cmpSGU  byte address compareSignalingGreaterUnordered(source1, source2)
+cmpQGU:      EQU     0x7CEC     ;cmpQGU  byte address compareQuietGreaterUnordered(source1, source2)    
+cmpQU:       EQU     0x7CEB     ;cmpQU  byte address compareQuietUnordered(source1, source2) 
+cmpQO:       EQU     0x7CEA     ;cmpQO  byte address compareQuietOrdered(source1, source2)             
+tOrd:        EQU     0x7CE9     ;total order
+tOrdM:       EQU     0x7CE8     ;total order magnitude           
+razFlg:      EQU     0x7CE7;     
+lowFlg:      EQU     0x7CE6;                                      
+razNoFlag:   EQU     0x7CE5;     
+lowNoFlag:   EQU     0x7CE4;     
+tstFlg:      EQU     0x7CE3;                                
+rstrFlg:     EQU     0x7CE2;
+razSig:      EQU     0x7CE1;     
+lowSig:      EQU     0x7CE0;     
+setSubstt:   EQU     0x7CDF;     
+clrSubstt:   EQU     0x7CDE;     
+setDVNCZ:    EQU     0x7CDD;     
+clrDVNCZ:    EQU     0x7CDC;     
+setAltImm:   EQU     0x7CDB;     
+clrAltImm:   EQU     0x7CDA;     
+deflt:       EQU     0x7CD9;
+isCanonical: EQU     0x7CD8;
+isSignaling: EQU     0x7CD7;
+isNaN:       EQU     0x7CD6;
+isInfinite:  EQU     0x7CD5;
+isSubnormal: EQU     0x7CD4;
+isZero:      EQU     0x7CD3;
+isFinite:    EQU     0x7CD2;
+isNormal:    EQU     0x7CD1;
+isSignMinus: EQU     0x7CD0;
+
+
+
+XCU_PREEMPT:        EQU   0x7FD4
+XCU_SSTEP:          EQU   0x7FD3
+XCU_FORCE_BREAK:    EQU   0x7FD2
+XCU_FORCE_RESET:    EQU   0x7FD1
+is2008:             EQU   0x7FD0   ;read this location to get 0x01--true
+
+XCU_MON_POKE_ALL:   EQU   0x7FC0
+XCU_MON_REQUEST.F:  EQU   0x7FBF
+XCU_MON_REQUEST.E:  EQU   0x7FBE
+XCU_MON_REQUEST.D:  EQU   0x7FBD
+XCU_MON_REQUEST.C:  EQU   0x7FBC
+XCU_MON_REQUEST.B:  EQU   0x7FBB
+XCU_MON_REQUEST.A:  EQU   0x7FBA
+XCU_MON_REQUEST.9:  EQU   0x7FB9
+XCU_MON_REQUEST.8:  EQU   0x7FB8
+XCU_MON_REQUEST.7:  EQU   0x7FB7
+XCU_MON_REQUEST.6:  EQU   0x7FB6
+XCU_MON_REQUEST.5:  EQU   0x7FB5
+XCU_MON_REQUEST.4:  EQU   0x7FB4
+XCU_MON_REQUEST.3:  EQU   0x7FB3
+XCU_MON_REQUEST.2:  EQU   0x7FB2
+XCU_MON_REQUEST.1:  EQU   0x7FB1
+XCU_MON_REQUEST.0:  EQU   0x7FB0
+
+is1985:      EQU     0x00000000 ;read this location to get 0x00--false
+                         
+;----------------------------------------------------------------------------------------------
+;eXtended Compute Unit (XCU) operators
+;----------------------------------------------------------------------------------------------
+XCUpushAll:  EQU     0x7FC0
+
+pshXCU.15:   EQU     0x7FBF
+pshXCU.14:   EQU     0x7FBE
+pshXCU.13:   EQU     0x7FBD
+pshXCU.12:   EQU     0x7FBC
+pshXCU.11:   EQU     0x7FBB
+pshXCU.10:   EQU     0x7FBA
+pshXCU.9:    EQU     0x7FB9
+pshXCU.8:    EQU     0x7FB8
+pshXCU.7:    EQU     0x7FB7
+pshXCU.6:    EQU     0x7FB6
+pshXCU.5:    EQU     0x7FB5
+pshXCU.4:    EQU     0x7FB4
+pshXCU.3:    EQU     0x7FB3
+pshXCU.2:    EQU     0x7FB2
+pshXCU.1:    EQU     0x7FB1
+pshXCU.0:    EQU     0x7FB0
+
+pulXCU.15:   EQU     0x7FAF
+pulXCU.14:   EQU     0x7FAE
+pulXCU.13:   EQU     0x7FAD
+pulXCU.12:   EQU     0x7FAC
+pulXCU.11:   EQU     0x7FAB
+pulXCU.10:   EQU     0x7FAA
+pulXCU.9:    EQU     0x7FA9
+pulXCU.8:    EQU     0x7FA8
+pulXCU.7:    EQU     0x7FA7
+pulXCU.6:    EQU     0x7FA6
+pulXCU.5:    EQU     0x7FA5
+pulXCU.4:    EQU     0x7FA4
+pulXCU.3:    EQU     0x7FA3
+pulXCU.2:    EQU     0x7FA2
+pulXCU.1:    EQU     0x7FA1
+pulXCU.0:    EQU     0x7FA0
+
+
+
+;----------------------------------------------------------------------------------------------
+;Integer math and logic OPERATOR memory-mapped addresses and corresponding results storage bins
+;----------------------------------------------------------------------------------------------
+
+AND.15:      EQU     0x7EFF
+AND.14:      EQU     0x7EFE
+AND.13:      EQU     0x7EFD
+AND.12:      EQU     0x7EFC
+AND.11:      EQU     0x7EFB
+AND.10:      EQU     0x7EFA
+AND.9:       EQU     0x7EF9
+AND.8:       EQU     0x7EF8
+AND.7:       EQU     0x7EF7
+AND.6:       EQU     0x7EF6
+AND.5:       EQU     0x7EF5
+AND.4:       EQU     0x7EF4
+AND.3:       EQU     0x7EF3
+AND.2:       EQU     0x7EF2
+AND.1:       EQU     0x7EF1
+AND.0:       EQU     0x7EF0
+
+OR.15:       EQU     0x7EEF
+OR.14:       EQU     0x7EEE
+OR.13:       EQU     0x7EED
+OR.12:       EQU     0x7EEC
+OR.11:       EQU     0x7EEB
+OR.10:       EQU     0x7EEA
+OR.9:        EQU     0x7EE9
+OR.8:        EQU     0x7EE8
+OR.7:        EQU     0x7EE7
+OR.6:        EQU     0x7EE6
+OR.5:        EQU     0x7EE5
+OR.4:        EQU     0x7EE4
+OR.3:        EQU     0x7EE3
+OR.2:        EQU     0x7EE2
+OR.1:        EQU     0x7EE1
+OR.0:        EQU     0x7EE0
+
+XOR.15:      EQU     0x7EDF
+XOR.14:      EQU     0x7EDE
+XOR.13:      EQU     0x7EDD
+XOR.12:      EQU     0x7EDC
+XOR.11:      EQU     0x7EDB
+XOR.10:      EQU     0x7EDA
+XOR.9:       EQU     0x7ED9
+XOR.8:       EQU     0x7ED8
+XOR.7:       EQU     0x7ED7
+XOR.6:       EQU     0x7ED6
+XOR.5:       EQU     0x7ED5
+XOR.4:       EQU     0x7ED4
+XOR.3:       EQU     0x7ED3
+XOR.2:       EQU     0x7ED2
+XOR.1:       EQU     0x7ED1
+XOR.0:       EQU     0x7ED0
+
+ADD.15:      EQU     0x7ECF
+ADD.14:      EQU     0x7ECE
+ADD.13:      EQU     0x7ECD
+ADD.12:      EQU     0x7ECC
+ADD.11:      EQU     0x7ECB
+ADD.10:      EQU     0x7ECA
+ADD.9:       EQU     0x7EC9
+ADD.8:       EQU     0x7EC8
+ADD.7:       EQU     0x7EC7
+ADD.6:       EQU     0x7EC6
+ADD.5:       EQU     0x7EC5
+ADD.4:       EQU     0x7EC4
+ADD.3:       EQU     0x7EC3
+ADD.2:       EQU     0x7EC2
+ADD.1:       EQU     0x7EC1
+ADD.0:       EQU     0x7EC0
+
+ADDC.15:     EQU     0x7EBF
+ADDC.14:     EQU     0x7EBE
+ADDC.13:     EQU     0x7EBD
+ADDC.12:     EQU     0x7EBC
+ADDC.11:     EQU     0x7EBB
+ADDC.10:     EQU     0x7EBA
+ADDC.9:      EQU     0x7EB9
+ADDC.8:      EQU     0x7EB8
+ADDC.7:      EQU     0x7EB7
+ADDC.6:      EQU     0x7EB6
+ADDC.5:      EQU     0x7EB5
+ADDC.4:      EQU     0x7EB4
+ADDC.3:      EQU     0x7EB3
+ADDC.2:      EQU     0x7EB2
+ADDC.1:      EQU     0x7EB1
+ADDC.0:      EQU     0x7EB0
+
+SUB.15:      EQU     0x7EAF
+SUB.14:      EQU     0x7EAE
+SUB.13:      EQU     0x7EAD
+SUB.12:      EQU     0x7EAC
+SUB.11:      EQU     0x7EAB
+SUB.10:      EQU     0x7EAA
+SUB.9:       EQU     0x7EA9
+SUB.8:       EQU     0x7EA8
+SUB.7:       EQU     0x7EA7
+SUB.6:       EQU     0x7EA6
+SUB.5:       EQU     0x7EA5
+SUB.4:       EQU     0x7EA4
+SUB.3:       EQU     0x7EA3
+SUB.2:       EQU     0x7EA2
+SUB.1:       EQU     0x7EA1
+SUB.0:       EQU     0x7EA0
+
+SUBB.15:     EQU     0x7E9F
+SUBB.14:     EQU     0x7E9E
+SUBB.13:     EQU     0x7E9D
+SUBB.12:     EQU     0x7E9C
+SUBB.11:     EQU     0x7E9B
+SUBB.10:     EQU     0x7E9A
+SUBB.9:      EQU     0x7E99
+SUBB.8:      EQU     0x7E98
+SUBB.7:      EQU     0x7E97
+SUBB.6:      EQU     0x7E96
+SUBB.5:      EQU     0x7E95
+SUBB.4:      EQU     0x7E94
+SUBB.3:      EQU     0x7E93
+SUBB.2:      EQU     0x7E92
+SUBB.1:      EQU     0x7E91
+SUBB.0:      EQU     0x7E90
+
+MUL.15:      EQU     0x7E8F
+MUL.14:      EQU     0x7E8E
+MUL.13:      EQU     0x7E8D
+MUL.12:      EQU     0x7E8C
+MUL.11:      EQU     0x7E8B
+MUL.10:      EQU     0x7E8A
+MUL.9:       EQU     0x7E89
+MUL.8:       EQU     0x7E88
+MUL.7:       EQU     0x7E87
+MUL.6:       EQU     0x7E86
+MUL.5:       EQU     0x7E85
+MUL.4:       EQU     0x7E84
+MUL.3:       EQU     0x7E83
+MUL.2:       EQU     0x7E82
+MUL.1:       EQU     0x7E81
+MUL.0:       EQU     0x7E80
+
+DIV.15:      EQU     0x7E7F
+DIV.14:      EQU     0x7E7E
+DIV.13:      EQU     0x7E7D
+DIV.12:      EQU     0x7E7C
+DIV.11:      EQU     0x7E7B
+DIV.10:      EQU     0x7E7A
+DIV.9:       EQU     0x7E79
+DIV.8:       EQU     0x7E78
+DIV.7:       EQU     0x7E77
+DIV.6:       EQU     0x7E76
+DIV.5:       EQU     0x7E75
+DIV.4:       EQU     0x7E74
+DIV.3:       EQU     0x7E73
+DIV.2:       EQU     0x7E72
+DIV.1:       EQU     0x7E71
+DIV.0:       EQU     0x7E70
+
+SHIFT.15:    EQU     0x7E6F
+SHIFT.14:    EQU     0x7E6E
+SHIFT.13:    EQU     0x7E6D
+SHIFT.12:    EQU     0x7E6C
+SHIFT.11:    EQU     0x7E6B
+SHIFT.10:    EQU     0x7E6A
+SHIFT.9:     EQU     0x7E69
+SHIFT.8:     EQU     0x7E68
+SHIFT.7:     EQU     0x7E67
+SHIFT.6:     EQU     0x7E66
+SHIFT.5:     EQU     0x7E65
+SHIFT.4:     EQU     0x7E64
+SHIFT.3:     EQU     0x7E63
+SHIFT.2:     EQU     0x7E62
+SHIFT.1:     EQU     0x7E61
+SHIFT.0:     EQU     0x7E60
+
+MAX.15:      EQU     0x7E5F
+MAX.14:      EQU     0x7E5E
+MAX.13:      EQU     0x7E5D
+MAX.12:      EQU     0x7E5C
+MAX.11:      EQU     0x7E5B
+MAX.10:      EQU     0x7E5A
+MAX.9:       EQU     0x7E59
+MAX.8:       EQU     0x7E58
+MAX.7:       EQU     0x7E57
+MAX.6:       EQU     0x7E56
+MAX.5:       EQU     0x7E55
+MAX.4:       EQU     0x7E54
+MAX.3:       EQU     0x7E53
+MAX.2:       EQU     0x7E52
+MAX.1:       EQU     0x7E51
+MAX.0:       EQU     0x7E50
+
+MIN.15:      EQU     0x7E4F
+MIN.14:      EQU     0x7E4E
+MIN.13:      EQU     0x7E4D
+MIN.12:      EQU     0x7E4C
+MIN.11:      EQU     0x7E4B
+MIN.10:      EQU     0x7E4A
+MIN.9:       EQU     0x7E49
+MIN.8:       EQU     0x7E48
+MIN.7:       EQU     0x7E47
+MIN.6:       EQU     0x7E46
+MIN.5:       EQU     0x7E45
+MIN.4:       EQU     0x7E44
+MIN.3:       EQU     0x7E43
+MIN.2:       EQU     0x7E42
+MIN.1:       EQU     0x7E41
+MIN.0:       EQU     0x7E40
+
+BSET.15:     EQU     0x7E3F
+BSET.14:     EQU     0x7E3E
+BSET.13:     EQU     0x7E3D
+BSET.12:     EQU     0x7E3C
+BSET.11:     EQU     0x7E3B
+BSET.10:     EQU     0x7E3A
+BSET.9:      EQU     0x7E39
+BSET.8:      EQU     0x7E38
+BSET.7:      EQU     0x7E37
+BSET.6:      EQU     0x7E36
+BSET.5:      EQU     0x7E35
+BSET.4:      EQU     0x7E34
+BSET.3:      EQU     0x7E33
+BSET.2:      EQU     0x7E32
+BSET.1:      EQU     0x7E31
+BSET.0:      EQU     0x7E30
+
+BCLR.15:     EQU     0x7E2F
+BCLR.14:     EQU     0x7E2E
+BCLR.13:     EQU     0x7E2D
+BCLR.12:     EQU     0x7E2C
+BCLR.11:     EQU     0x7E2B
+BCLR.10:     EQU     0x7E2A
+BCLR.9:      EQU     0x7E29
+BCLR.8:      EQU     0x7E28
+BCLR.7:      EQU     0x7E27
+BCLR.6:      EQU     0x7E26
+BCLR.5:      EQU     0x7E25
+BCLR.4:      EQU     0x7E24
+BCLR.3:      EQU     0x7E23
+BCLR.2:      EQU     0x7E22
+BCLR.1:      EQU     0x7E21
+BCLR.0:      EQU     0x7E20
+
+ENDI.15:     EQU     0x7E1F
+ENDI.14:     EQU     0x7E1E
+ENDI.13:     EQU     0x7E1D
+ENDI.12:     EQU     0x7E1C
+ENDI.11:     EQU     0x7E1B
+ENDI.10:     EQU     0x7E1A
+ENDI.9:      EQU     0x7E19
+ENDI.8:      EQU     0x7E18
+ENDI.7:      EQU     0x7E17
+ENDI.6:      EQU     0x7E16
+ENDI.5:      EQU     0x7E15
+ENDI.4:      EQU     0x7E14
+ENDI.3:      EQU     0x7E13
+ENDI.2:      EQU     0x7E12
+ENDI.1:      EQU     0x7E11
+ENDI.0:      EQU     0x7E10
+
+cnvFBTA.15:  EQU     0x7E0F  ;convert from binary numeric to ASCII numeric                           
+cnvFBTA.14:  EQU     0x7E0E
+cnvFBTA.13:  EQU     0x7E0D
+cnvFBTA.12:  EQU     0x7E0C
+cnvFBTA.11:  EQU     0x7E0B
+cnvFBTA.10:  EQU     0x7E0A
+cnvFBTA.9:   EQU     0x7E09
+cnvFBTA.8:   EQU     0x7E08
+cnvFBTA.7:   EQU     0x7E07
+cnvFBTA.6:   EQU     0x7E06
+cnvFBTA.5:   EQU     0x7E05
+cnvFBTA.4:   EQU     0x7E04
+cnvFBTA.3:   EQU     0x7E03
+cnvFBTA.2:   EQU     0x7E02
+cnvFBTA.1:   EQU     0x7E01
+cnvFBTA.0:   EQU     0x7E00
+
+cnvTBFA.15:  EQU     0x7DFF  ;convert to binary numeric from ASCII numeric
+cnvTBFA.14:  EQU     0x7DFE
+cnvTBFA.13:  EQU     0x7DFD                                                                   
+cnvTBFA.12:  EQU     0x7DFC
+cnvTBFA.11:  EQU     0x7DFB
+cnvTBFA.10:  EQU     0x7DFA
+cnvTBFA.9:   EQU     0x7DF9
+cnvTBFA.8:   EQU     0x7DF8
+cnvTBFA.7:   EQU     0x7DF7
+cnvTBFA.6:   EQU     0x7DF6
+cnvTBFA.5:   EQU     0x7DF5
+cnvTBFA.4:   EQU     0x7DF4
+cnvTBFA.3:   EQU     0x7DF3
+cnvTBFA.2:   EQU     0x7DF2
+cnvTBFA.1:   EQU     0x7DF1
+cnvTBFA.0:   EQU     0x7DF0
+
+cmpSE:       EQU     0x7CFF     ;cmpSE  byte address compareSignalingEqual(source1, source2)           
+cmpQE:       EQU     0x7CFE     ;cmpQE   byte address compareQuietEqual(source1, source2)               
+cmpSNE:      EQU     0x7CFD     ;cmpSNE  byte address compareSignalingNotEqual(source1, source2)        
+cmpQNE:      EQU     0x7CFC     ;cmpQNE  byte address compareQuietNotEqual(source1, source2)            
+cmpSG:       EQU     0x7CFB     ;cmpSG  byte address compareSignalingGreater(source1, source2)         
+cmpQG:       EQU     0x7CFA     ;cmpQG  byte address compareQuietGreater(source1, source2)             
+cmpSGE:      EQU     0x7CF9     ;cmpSGE  byte address compareSignalingGreaterEqual(source1, source2)    
+cmpQGE:      EQU     0x7CF8     ;cmpQGE  byte address compareQuietGreaterEqual(source1, source2)        
+cmpSL:       EQU     0x7CF7     ;cmpSL  byte address compareSignalingLess(source1, source2)            
+cmpQL:       EQU     0x7CF6     ;cmpQL  byte address compareQuietLess(source1, source2)                
+cmpSLE:      EQU     0x7CF5     ;cmpSLE  byte address compareSignalingLessEqual(source1, source2)       
+cmpQLE:      EQU     0x7CF4     ;cmpQLE  byte address compareQuietLessEqual(source1, source2)           
+cmpSNG:      EQU     0x7CF3     ;cmpSNG  byte address compareSignalingNotGreater(source1, source2)      
+cmpQNG:      EQU     0x7CF2     ;cmpQNG  byte address compareQuietNotGreater(source1, source2)          
+cmpSLU:      EQU     0x7CF1     ;cmpSLU  byte address compareSignalingLessUnordered(source1, source2)   
+cmpQLU:      EQU     0x7CF0     ;cmpQLU  byte address compareQuietLessUnordered(source1, source2)       
+cmpSNL:      EQU     0x7CEF     ;cmpSNL  byte address compareSignalingNotLess(source1, source2)         
+cmpQNL:      EQU     0x7CEE     ;cmpQNL  byte address compareQuietNotLess(source1, source2)             
+cmpSGU:      EQU     0x7CED     ;cmpSGU  byte address compareSignalingGreaterUnordered(source1, source2)
+cmpQGU:      EQU     0x7CEC     ;cmpQGU  byte address compareQuietGreaterUnordered(source1, source2)    
+cmpQU:       EQU     0x7CEB     ;cmpQU  byte address compareQuietUnordered(source1, source2) 
+cmpQO:       EQU     0x7CEA     ;cmpQO  byte address compareQuietOrdered(source1, source2)             
+tOrd:        EQU     0x7CE9     ;total order
+tOrdM:       EQU     0x7CE8     ;total order magnitude           
+razFlg:      EQU     0x7CE7     ;raise flags
+lowFlg:      EQU     0x7CE6     ;lower flags                                 
+razNoFlags:  EQU     0x7CE5     ;raise no flags
+lowNoFlags:  EQU     0x7CE4
+tstFlg:      EQU     0x7CE3     ;test flags                                       
+rstrFlg:     EQU     0x7CE2     ;restore flags
+razSigs:     EQU     0x7CE1     ;raise signals
+lowerSigs:   EQU     0x7CE0     ;lower signals
+setSubstt:   EQU     0x7CDF    
+clrSubstt:   EQU     0x7CDE    
+setDVNCZ:    EQU     0x7CDD     
+clrDVNCZ:    EQU     0x7CDC     
+enAltImHand: EQU     0x7CDB
+dsAltImHand: EQU     0x7CDA
+deflt:       EQU     0x7CD9
+isCanonical: EQU     0x7CD8
+isSignaling: EQU     0x7CD7
+isNaN:       EQU     0x7CD6
+isInfinite:  EQU     0x7CD5
+isSubnormal: EQU     0x7CD4
+isZero:      EQU     0x7CD3
+isFinite:    EQU     0x7CD2
+isNormal:    EQU     0x7CD1
+isSignMinus: EQU     0x7CD0
+           
+                        
+;--------------------------------------------------------------------------
+;FP OPERATOR memory-mapped addresses and corresponding results storage bins
+;--------------------------------------------------------------------------
+UC.31:       EQU     0x7B9F
+UC.30:       EQU     0x7B9E
+UC.29:       EQU     0x7B9D
+UC.28:       EQU     0x7B9C
+UC.27:       EQU     0x7B9B
+UC.26:       EQU     0x7B9A
+UC.25:       EQU     0x7B99
+UC.24:       EQU     0x7B98
+UC.23:       EQU     0x7B97
+UC.22:       EQU     0x7B96
+UC.21:       EQU     0x7B95
+UC.20:       EQU     0x7B94
+UC.19:       EQU     0x7B93
+UC.18:       EQU     0x7B92
+UC.17:       EQU     0x7B91
+UC.16:       EQU     0x7B90
+UC.15:       EQU     0x7B8F
+UC.14:       EQU     0x7B8E
+UC.13:       EQU     0x7B8D
+UC.12:       EQU     0x7B8C
+UC.11:       EQU     0x7B8B
+UC.10:       EQU     0x7B8A
+UC.9:        EQU     0x7B89
+UC.8:        EQU     0x7B88
+UC.7:        EQU     0x7B87
+UC.6:        EQU     0x7B86
+UC.5:        EQU     0x7B85
+UC.4:        EQU     0x7B84
+UC.3:        EQU     0x7B83
+UC.2:        EQU     0x7B82
+UC.1:        EQU     0x7B81
+UC.0:        EQU     0x7B80
+
+UFMA.31:     EQU     0x7B7F
+UFMA.30:     EQU     0x7B7E
+UFMA.29:     EQU     0x7B7D
+UFMA.28:     EQU     0x7B7C
+UFMA.27:     EQU     0x7B7B
+UFMA.26:     EQU     0x7B7A
+UFMA.25:     EQU     0x7B79
+UFMA.24:     EQU     0x7B78
+UFMA.23:     EQU     0x7B77
+UFMA.22:     EQU     0x7B76
+UFMA.21:     EQU     0x7B75
+UFMA.20:     EQU     0x7B74
+UFMA.19:     EQU     0x7B73
+UFMA.18:     EQU     0x7B72
+UFMA.17:     EQU     0x7B71
+UFMA.16:     EQU     0x7B70
+UFMA.15:     EQU     0x7B6F
+UFMA.14:     EQU     0x7B6E
+UFMA.13:     EQU     0x7B6D
+UFMA.12:     EQU     0x7B6C
+UFMA.11:     EQU     0x7B6B
+UFMA.10:     EQU     0x7B6A
+UFMA.9:      EQU     0x7B69
+UFMA.8:      EQU     0x7B68
+UFMA.7:      EQU     0x7B67
+UFMA.6:      EQU     0x7B66
+UFMA.5:      EQU     0x7B65
+UFMA.4:      EQU     0x7B64
+UFMA.3:      EQU     0x7B63
+UFMA.2:      EQU     0x7B62
+UFMA.1:      EQU     0x7B61
+UFMA.0:      EQU     0x7B60
+
+SIND.15:     EQU     0x7B5F 
+SIND.14:     EQU     0x7B5E
+SIND.13:     EQU     0x7B5D
+SIND.12:     EQU     0x7B5C
+SIND.11:     EQU     0x7B5B 
+SIND.10:     EQU     0x7B5A
+SIND.9:      EQU     0x7B59
+SIND.8:      EQU     0x7B58
+SIND.7:      EQU     0x7B57 
+SIND.6:      EQU     0x7B56
+SIND.5:      EQU     0x7B55
+SIND.4:      EQU     0x7B54
+SIND.3:      EQU     0x7B53 
+SIND.2:      EQU     0x7B52
+SIND.1:      EQU     0x7B51
+SIND.0:      EQU     0x7B50
+
+COSD.15:     EQU     0x7B4F
+COSD.14:     EQU     0x7B4E
+COSD.13:     EQU     0x7B4D
+COSD.12:     EQU     0x7B4C
+COSD.11:     EQU     0x7B4B
+COSD.10:     EQU     0x7B4A
+COSD.9:      EQU     0x7B49
+COSD.8:      EQU     0x7B48
+COSD.7:      EQU     0x7B47
+COSD.6:      EQU     0x7B46
+COSD.5:      EQU     0x7B45
+COSD.4:      EQU     0x7B44
+COSD.3:      EQU     0x7B43
+COSD.2:      EQU     0x7B42
+COSD.1:      EQU     0x7B41
+COSD.0:      EQU     0x7B40
+
+TAND.15:     EQU     0x7B3F
+TAND.14:     EQU     0x7B3E
+TAND.13:     EQU     0x7B3D
+TAND.12:     EQU     0x7B3C
+TAND.11:     EQU     0x7B3B
+TAND.10:     EQU     0x7B3A
+TAND.9:      EQU     0x7B39
+TAND.8:      EQU     0x7B38
+TAND.7:      EQU     0x7B37
+TAND.6:      EQU     0x7B36
+TAND.5:      EQU     0x7B35
+TAND.4:      EQU     0x7B34
+TAND.3:      EQU     0x7B33
+TAND.2:      EQU     0x7B32
+TAND.1:      EQU     0x7B31
+TAND.0:      EQU     0x7B30
+
+COTD.15:     EQU     0x7B2F
+COTD.14:     EQU     0x7B2E
+COTD.13:     EQU     0x7B2D
+COTD.12:     EQU     0x7B2C
+COTD.11:     EQU     0x7B2B
+COTD.10:     EQU     0x7B2A
+COTD.9:      EQU     0x7B29
+COTD.8:      EQU     0x7B28
+COTD.7:      EQU     0x7B27
+COTD.6:      EQU     0x7B26
+COTD.5:      EQU     0x7B25
+COTD.4:      EQU     0x7B24
+COTD.3:      EQU     0x7B23
+COTD.2:      EQU     0x7B22
+COTD.1:      EQU     0x7B21
+COTD.0:      EQU     0x7B20
+
+LOG.15:      EQU     0x7B1F
+LOG.14:      EQU     0x7B1E
+LOG.13:      EQU     0x7B1D
+LOG.12:      EQU     0x7B1C
+LOG.11:      EQU     0x7B1B
+LOG.10:      EQU     0x7B1A
+LOG.9:       EQU     0x7B19
+LOG.8:       EQU     0x7B18
+LOG.7:       EQU     0x7B17
+LOG.6:       EQU     0x7B16
+LOG.5:       EQU     0x7B15
+LOG.4:       EQU     0x7B14
+LOG.3:       EQU     0x7B13
+LOG.2:       EQU     0x7B12
+LOG.1:       EQU     0x7B11
+LOG.0:       EQU     0x7B10
+
+EXP.15:      EQU     0x7B0F
+EXP.14:      EQU     0x7B0E
+EXP.13:      EQU     0x7B0D
+EXP.12:      EQU     0x7B0C
+EXP.11:      EQU     0x7B0B
+EXP.10:      EQU     0x7B0A
+EXP.9:       EQU     0x7B09
+EXP.8:       EQU     0x7B08
+EXP.7:       EQU     0x7B07
+EXP.6:       EQU     0x7B06
+EXP.5:       EQU     0x7B05
+EXP.4:       EQU     0x7B04
+EXP.3:       EQU     0x7B03
+EXP.2:       EQU     0x7B02
+EXP.1:       EQU     0x7B01
+EXP.0:       EQU     0x7B00
+
+pow.31:      EQU     0x7AFF
+pow.30:      EQU     0x7AFE
+pow.29:      EQU     0x7AFD
+pow.28:      EQU     0x7AFC
+pow.27:      EQU     0x7AFB
+pow.26:      EQU     0x7AFA
+pow.25:      EQU     0x7AF9
+pow.24:      EQU     0x7AF8
+pow.23:      EQU     0x7AF7
+pow.22:      EQU     0x7AF6
+pow.21:      EQU     0x7AF5
+pow.20:      EQU     0x7AF4
+pow.19:      EQU     0x7AF3
+pow.18:      EQU     0x7AF2
+pow.17:      EQU     0x7AF1
+pow.16:      EQU     0x7AF0
+pow.15:      EQU     0x7AEF
+pow.14:      EQU     0x7AEE
+pow.13:      EQU     0x7AED
+pow.12:      EQU     0x7AEC
+pow.11:      EQU     0x7AEB
+pow.10:      EQU     0x7AEA
+pow.9:       EQU     0x7AE9
+pow.8:       EQU     0x7AE8
+pow.7:       EQU     0x7AE7
+pow.6:       EQU     0x7AE6
+pow.5:       EQU     0x7AE5
+pow.4:       EQU     0x7AE4
+pow.3:       EQU     0x7AE3
+pow.2:       EQU     0x7AE2
+pow.1:       EQU     0x7AE1
+pow.0:       EQU     0x7AE0
+
+cnvFDCS.31:  EQU     0x7ADF
+cnvFDCS.30:  EQU     0x7ADE
+cnvFDCS.29:  EQU     0x7ADD
+cnvFDCS.28:  EQU     0x7ADC
+cnvFDCS.27:  EQU     0x7ADB
+cnvFDCS.26:  EQU     0x7ADA
+cnvFDCS.25:  EQU     0x7AD9
+cnvFDCS.24:  EQU     0x7AD8
+cnvFDCS.23:  EQU     0x7AD7
+cnvFDCS.22:  EQU     0x7AD6
+cnvFDCS.21:  EQU     0x7AD5
+cnvFDCS.20:  EQU     0x7AD4
+cnvFDCS.19:  EQU     0x7AD3
+cnvFDCS.18:  EQU     0x7AD2
+cnvFDCS.17:  EQU     0x7AD1
+cnvFDCS.16:  EQU     0x7AD0
+cnvFDCS.15:  EQU     0x7ACF
+cnvFDCS.14:  EQU     0x7ACE
+cnvFDCS.13:  EQU     0x7ACD
+cnvFDCS.12:  EQU     0x7ACC
+cnvFDCS.11:  EQU     0x7ACB
+cnvFDCS.10:  EQU     0x7ACA
+cnvFDCS.9:   EQU     0x7AC9
+cnvFDCS.8:   EQU     0x7AC8
+cnvFDCS.7:   EQU     0x7AC7
+cnvFDCS.6:   EQU     0x7AC6
+cnvFDCS.5:   EQU     0x7AC5
+cnvFDCS.4:   EQU     0x7AC4
+cnvFDCS.3:   EQU     0x7AC3
+cnvFDCS.2:   EQU     0x7AC2
+cnvFDCS.1:   EQU     0x7AC1
+cnvFDCS.0:   EQU     0x7AC0
+
+cnvTDCS.31:  EQU     0x7ABF
+cnvTDCS.30:  EQU     0x7ABE
+cnvTDCS.29:  EQU     0x7ABD
+cnvTDCS.28:  EQU     0x7ABC
+cnvTDCS.27:  EQU     0x7ABB
+cnvTDCS.26:  EQU     0x7ABA
+cnvTDCS.25:  EQU     0x7AB9
+cnvTDCS.24:  EQU     0x7AB8
+cnvTDCS.23:  EQU     0x7AB7
+cnvTDCS.22:  EQU     0x7AB6
+cnvTDCS.21:  EQU     0x7AB5
+cnvTDCS.20:  EQU     0x7AB4
+cnvTDCS.19:  EQU     0x7AB3
+cnvTDCS.18:  EQU     0x7AB2
+cnvTDCS.17:  EQU     0x7AB1
+cnvTDCS.16:  EQU     0x7AB0
+cnvTDCS.15:  EQU     0x7AAF
+cnvTDCS.14:  EQU     0x7AAE
+cnvTDCS.13:  EQU     0x7AAD
+cnvTDCS.12:  EQU     0x7AAC
+cnvTDCS.11:  EQU     0x7AAB
+cnvTDCS.10:  EQU     0x7AAA
+cnvTDCS.9:   EQU     0x7AA9
+cnvTDCS.8:   EQU     0x7AA8
+cnvTDCS.7:   EQU     0x7AA7
+cnvTDCS.6:   EQU     0x7AA6
+cnvTDCS.5:   EQU     0x7AA5
+cnvTDCS.4:   EQU     0x7AA4
+cnvTDCS.3:   EQU     0x7AA3
+cnvTDCS.2:   EQU     0x7AA2
+cnvTDCS.1:   EQU     0x7AA1
+cnvTDCS.0:   EQU     0x7AA0
+
+cnvFHCS.15:  EQU     0x7A9F
+cnvFHCS.14:  EQU     0x7A9E
+cnvFHCS.13:  EQU     0x7A9D
+cnvFHCS.12:  EQU     0x7A9C
+cnvFHCS.11:  EQU     0x7A9B
+cnvFHCS.10:  EQU     0x7A9A
+cnvFHCS.9:   EQU     0x7A99
+cnvFHCS.8:   EQU     0x7A98
+cnvFHCS.7:   EQU     0x7A97
+cnvFHCS.6:   EQU     0x7A96
+cnvFHCS.5:   EQU     0x7A95
+cnvFHCS.4:   EQU     0x7A94
+cnvFHCS.3:   EQU     0x7A93
+cnvFHCS.2:   EQU     0x7A92
+cnvFHCS.1:   EQU     0x7A91
+cnvFHCS.0:   EQU     0x7A90
+
+cnvTHCS.15:  EQU     0x7A8F
+cnvTHCS.14:  EQU     0x7A8E
+cnvTHCS.13:  EQU     0x7A8D
+cnvTHCS.12:  EQU     0x7A8C
+cnvTHCS.11:  EQU     0x7A8B
+cnvTHCS.10:  EQU     0x7A8A
+cnvTHCS.9:   EQU     0x7A89
+cnvTHCS.8:   EQU     0x7A88
+cnvTHCS.7:   EQU     0x7A87
+cnvTHCS.6:   EQU     0x7A86
+cnvTHCS.5:   EQU     0x7A85
+cnvTHCS.4:   EQU     0x7A84
+cnvTHCS.3:   EQU     0x7A83
+cnvTHCS.2:   EQU     0x7A82
+cnvTHCS.1:   EQU     0x7A81
+cnvTHCS.0:   EQU     0x7A80
+
+CONV.15:     EQU     0x7A7F    
+CONV.14:     EQU     0x7A7E
+CONV.13:     EQU     0x7A7D
+CONV.12:     EQU     0x7A7C
+CONV.11:     EQU     0x7A7B
+CONV.10:     EQU     0x7A7A
+CONV.9:      EQU     0x7A79
+CONV.8:      EQU     0x7A78
+CONV.7:      EQU     0x7A77
+CONV.6:      EQU     0x7A76
+CONV.5:      EQU     0x7A75
+CONV.4:      EQU     0x7A74
+CONV.3:      EQU     0x7A73
+CONV.2:      EQU     0x7A72
+CONV.1:      EQU     0x7A71
+CONV.0:      EQU     0x7A70
+
+RTOIX.15:    EQU     0x7A6F    
+RTOIX.14:    EQU     0x7A6E
+RTOIX.13:    EQU     0x7A6D
+RTOIX.12:    EQU     0x7A6C
+RTOIX.11:    EQU     0x7A6B
+RTOIX.10:    EQU     0x7A6A
+RTOIX.9:     EQU     0x7A69
+RTOIX.8:     EQU     0x7A68
+RTOIX.7:     EQU     0x7A67
+RTOIX.6:     EQU     0x7A66
+RTOIX.5:     EQU     0x7A65
+RTOIX.4:     EQU     0x7A64
+RTOIX.3:     EQU     0x7A63
+RTOIX.2:     EQU     0x7A62
+RTOIX.1:     EQU     0x7A61
+RTOIX.0:     EQU     0x7A60
+
+RTOIN.15:    EQU     0x7A5F    
+RTOIN.14:    EQU     0x7A5E
+RTOIN.13:    EQU     0x7A5D
+RTOIN.12:    EQU     0x7A5C
+RTOIN.11:    EQU     0x7A5B
+RTOIN.10:    EQU     0x7A5A
+RTOIN.9:     EQU     0x7A59
+RTOIN.8:     EQU     0x7A58
+RTOIN.7:     EQU     0x7A57
+RTOIN.6:     EQU     0x7A56
+RTOIN.5:     EQU     0x7A55
+RTOIN.4:     EQU     0x7A54
+RTOIN.3:     EQU     0x7A53
+RTOIN.2:     EQU     0x7A52
+RTOIN.1:     EQU     0x7A51
+RTOIN.0:     EQU     0x7A50
+
+RTOIP.15:    EQU     0x7A4F    
+RTOIP.14:    EQU     0x7A4E
+RTOIP.13:    EQU     0x7A4D
+RTOIP.12:    EQU     0x7A4C
+RTOIP.11:    EQU     0x7A4B
+RTOIP.10:    EQU     0x7A4A
+RTOIP.9:     EQU     0x7A49
+RTOIP.8:     EQU     0x7A48
+RTOIP.7:     EQU     0x7A47
+RTOIP.6:     EQU     0x7A46
+RTOIP.5:     EQU     0x7A45
+RTOIP.4:     EQU     0x7A44
+RTOIP.3:     EQU     0x7A43
+RTOIP.2:     EQU     0x7A42
+RTOIP.1:     EQU     0x7A41
+RTOIP.0:     EQU     0x7A40
+
+RTOIZ.15:    EQU     0x7A3F    
+RTOIZ.14:    EQU     0x7A3E
+RTOIZ.13:    EQU     0x7A3D
+RTOIZ.12:    EQU     0x7A3C
+RTOIZ.11:    EQU     0x7A3B
+RTOIZ.10:    EQU     0x7A3A
+RTOIZ.9:     EQU     0x7A39
+RTOIZ.8:     EQU     0x7A38
+RTOIZ.7:     EQU     0x7A37
+RTOIZ.6:     EQU     0x7A36
+RTOIZ.5:     EQU     0x7A35
+RTOIZ.4:     EQU     0x7A34
+RTOIZ.3:     EQU     0x7A33
+RTOIZ.2:     EQU     0x7A32
+RTOIZ.1:     EQU     0x7A31
+RTOIZ.0:     EQU     0x7A30
+
+RTOIA.15:    EQU     0x7A2F    
+RTOIA.14:    EQU     0x7A2E
+RTOIA.13:    EQU     0x7A2D
+RTOIA.12:    EQU     0x7A2C
+RTOIA.11:    EQU     0x7A2B
+RTOIA.10:    EQU     0x7A2A
+RTOIA.9:     EQU     0x7A29
+RTOIA.8:     EQU     0x7A28
+RTOIA.7:     EQU     0x7A27
+RTOIA.6:     EQU     0x7A26
+RTOIA.5:     EQU     0x7A25
+RTOIA.4:     EQU     0x7A24
+RTOIA.3:     EQU     0x7A23
+RTOIA.2:     EQU     0x7A22
+RTOIA.1:     EQU     0x7A21
+RTOIA.0:     EQU     0x7A20
+
+RTOIE.15:    EQU     0x7A1F    
+RTOIE.14:    EQU     0x7A1E
+RTOIE.13:    EQU     0x7A1D
+RTOIE.12:    EQU     0x7A1C
+RTOIE.11:    EQU     0x7A1B
+RTOIE.10:    EQU     0x7A1A
+RTOIE.9:     EQU     0x7A19
+RTOIE.8:     EQU     0x7A18
+RTOIE.7:     EQU     0x7A17
+RTOIE.6:     EQU     0x7A16
+RTOIE.5:     EQU     0x7A15
+RTOIE.4:     EQU     0x7A14
+RTOIE.3:     EQU     0x7A13
+RTOIE.2:     EQU     0x7A12
+RTOIE.1:     EQU     0x7A11
+RTOIE.0:     EQU     0x7A10
+
+CTOIXN.15:   EQU     0x7A0F     ;convert to integer
+CTOIXN.14:   EQU     0x7A0E
+CTOIXN.13:   EQU     0x7A0D
+CTOIXN.12:   EQU     0x7A0C
+CTOIXN.11:   EQU     0x7A0B
+CTOIXN.10:   EQU     0x7A0A
+CTOIXN.9:    EQU     0x7A09
+CTOIXN.8:    EQU     0x7A08
+CTOIXN.7:    EQU     0x7A07
+CTOIXN.6:    EQU     0x7A06
+CTOIXN.5:    EQU     0x7A05
+CTOIXN.4:    EQU     0x7A04
+CTOIXN.3:    EQU     0x7A03
+CTOIXN.2:    EQU     0x7A02
+CTOIXN.1:    EQU     0x7A01
+CTOIXN.0:    EQU     0x7A00
+
+CTOIXP.15:   EQU     0x79FF    
+CTOIXP.14:   EQU     0x79FE
+CTOIXP.13:   EQU     0x79FD
+CTOIXP.12:   EQU     0x79FC
+CTOIXP.11:   EQU     0x79FB
+CTOIXP.10:   EQU     0x79FA
+CTOIXP.9:    EQU     0x79F9
+CTOIXP.8:    EQU     0x79F8
+CTOIXP.7:    EQU     0x79F7
+CTOIXP.6:    EQU     0x79F6
+CTOIXP.5:    EQU     0x79F5
+CTOIXP.4:    EQU     0x79F4
+CTOIXP.3:    EQU     0x79F3
+CTOIXP.2:    EQU     0x79F2
+CTOIXP.1:    EQU     0x79F1
+CTOIXP.0:    EQU     0x79F0
+
+CTOIXZ.15:   EQU     0x79EF    
+CTOIXZ.14:   EQU     0x79EE
+CTOIXZ.13:   EQU     0x79ED
+CTOIXZ.12:   EQU     0x79EC
+CTOIXZ.11:   EQU     0x79EB
+CTOIXZ.10:   EQU     0x79EA
+CTOIXZ.9:    EQU     0x79E9
+CTOIXZ.8:    EQU     0x79E8
+CTOIXZ.7:    EQU     0x79E7
+CTOIXZ.6:    EQU     0x79E6
+CTOIXZ.5:    EQU     0x79E5
+CTOIXZ.4:    EQU     0x79E4
+CTOIXZ.3:    EQU     0x79E3
+CTOIXZ.2:    EQU     0x79E2
+CTOIXZ.1:    EQU     0x79E1
+CTOIXZ.0:    EQU     0x79E0
+
+CTOIXA.15:   EQU     0x79DF    
+CTOIXA.14:   EQU     0x79DE
+CTOIXA.13:   EQU     0x79DD
+CTOIXA.12:   EQU     0x79DC
+CTOIXA.11:   EQU     0x79DB
+CTOIXA.10:   EQU     0x79DA
+CTOIXA.9:    EQU     0x79D9
+CTOIXA.8:    EQU     0x79D8
+CTOIXA.7:    EQU     0x79D7
+CTOIXA.6:    EQU     0x79D6
+CTOIXA.5:    EQU     0x79D5
+CTOIXA.4:    EQU     0x79D4
+CTOIXA.3:    EQU     0x79D3
+CTOIXA.2:    EQU     0x79D2
+CTOIXA.1:    EQU     0x79D1
+CTOIXA.0:    EQU     0x79D0
+
+CTOIXE.15:   EQU     0x79CF    
+CTOIXE.14:   EQU     0x79CE
+CTOIXE.13:   EQU     0x79CD
+CTOIXE.12:   EQU     0x79CC
+CTOIXE.11:   EQU     0x79CB
+CTOIXE.10:   EQU     0x79CA
+CTOIXE.9:    EQU     0x79C9
+CTOIXE.8:    EQU     0x79C8
+CTOIXE.7:    EQU     0x79C7
+CTOIXE.6:    EQU     0x79C6
+CTOIXE.5:    EQU     0x79C5
+CTOIXE.4:    EQU     0x79C4
+CTOIXE.3:    EQU     0x79C3
+CTOIXE.2:    EQU     0x79C2
+CTOIXE.1:    EQU     0x79C1
+CTOIXE.0:    EQU     0x79C0
+
+CTOIN.15:    EQU     0x79BF    
+CTOIN.14:    EQU     0x79BE
+CTOIN.13:    EQU     0x79BD
+CTOIN.12:    EQU     0x79BC
+CTOIN.11:    EQU     0x79BB
+CTOIN.10:    EQU     0x79BA
+CTOIN.9:     EQU     0x79B9
+CTOIN.8:     EQU     0x79B8
+CTOIN.7:     EQU     0x79B7
+CTOIN.6:     EQU     0x79B6
+CTOIN.5:     EQU     0x79B5
+CTOIN.4:     EQU     0x79B4
+CTOIN.3:     EQU     0x79B3
+CTOIN.2:     EQU     0x79B2
+CTOIN.1:     EQU     0x79B1
+CTOIN.0:     EQU     0x79B0
+
+CTOIP.15:    EQU     0x79AF    
+CTOIP.14:    EQU     0x79AE
+CTOIP.13:    EQU     0x79AD
+CTOIP.12:    EQU     0x79AC
+CTOIP.11:    EQU     0x79AB
+CTOIP.10:    EQU     0x79AA
+CTOIP.9:     EQU     0x79A9
+CTOIP.8:     EQU     0x79A8
+CTOIP.7:     EQU     0x79A7
+CTOIP.6:     EQU     0x79A6
+CTOIP.5:     EQU     0x79A5
+CTOIP.4:     EQU     0x79A4
+CTOIP.3:     EQU     0x79A3
+CTOIP.2:     EQU     0x79A2
+CTOIP.1:     EQU     0x79A1
+CTOIP.0:     EQU     0x79A0
+
+CTOIZ.15:    EQU     0x799F    
+CTOIZ.14:    EQU     0x799E
+CTOIZ.13:    EQU     0x799D
+CTOIZ.12:    EQU     0x799C
+CTOIZ.11:    EQU     0x799B
+CTOIZ.10:    EQU     0x799A
+CTOIZ.9:     EQU     0x7999
+CTOIZ.8:     EQU     0x7998
+CTOIZ.7:     EQU     0x7997
+CTOIZ.6:     EQU     0x7996
+CTOIZ.5:     EQU     0x7995
+CTOIZ.4:     EQU     0x7994
+CTOIZ.3:     EQU     0x7993
+CTOIZ.2:     EQU     0x7992
+CTOIZ.1:     EQU     0x7991
+CTOIZ.0:     EQU     0x7990
+
+CTOIA.15:    EQU     0x798F    
+CTOIA.14:    EQU     0x798E
+CTOIA.13:    EQU     0x798D
+CTOIA.12:    EQU     0x798C
+CTOIA.11:    EQU     0x798B
+CTOIA.10:    EQU     0x798A
+CTOIA.9:     EQU     0x7989
+CTOIA.8:     EQU     0x7988
+CTOIA.7:     EQU     0x7987
+CTOIA.6:     EQU     0x7986
+CTOIA.5:     EQU     0x7985
+CTOIA.4:     EQU     0x7984
+CTOIA.3:     EQU     0x7983
+CTOIA.2:     EQU     0x7982
+CTOIA.1:     EQU     0x7981
+CTOIA.0:     EQU     0x7980
+
+CTOIE.15:    EQU     0x797F    
+CTOIE.14:    EQU     0x797E
+CTOIE.13:    EQU     0x797D
+CTOIE.12:    EQU     0x797C
+CTOIE.11:    EQU     0x797B
+CTOIE.10:    EQU     0x797A
+CTOIE.9:     EQU     0x7979
+CTOIE.8:     EQU     0x7978
+CTOIE.7:     EQU     0x7977
+CTOIE.6:     EQU     0x7976
+CTOIE.5:     EQU     0x7975
+CTOIE.4:     EQU     0x7974
+CTOIE.3:     EQU     0x7973
+CTOIE.2:     EQU     0x7972
+CTOIE.1:     EQU     0x7971
+CTOIE.0:     EQU     0x7970
+
+CFI.15:      EQU     0x796F
+CFI.14:      EQU     0x796E
+CFI.13:      EQU     0x796D
+CFI.12:      EQU     0x796C
+CFI.11:      EQU     0x796B
+CFI.10:      EQU     0x796A
+CFI.9:       EQU     0x7969
+CFI.8:       EQU     0x7968
+CFI.7:       EQU     0x7967
+CFI.6:       EQU     0x7966
+CFI.5:       EQU     0x7965
+CFI.4:       EQU     0x7964
+CFI.3:       EQU     0x7963
+CFI.2:       EQU     0x7962
+CFI.1:       EQU     0x7961
+CFI.0:       EQU     0x7960
+
+SCALEB.15:   EQU     0x795F       
+SCALEB.14:   EQU     0x795E
+SCALEB.13:   EQU     0x795D
+SCALEB.12:   EQU     0x795C
+SCALEB.11:   EQU     0x795B
+SCALEB.10:   EQU     0x795A
+SCALEB.9:    EQU     0x7959
+SCALEB.8:    EQU     0x7958
+SCALEB.7:    EQU     0x7957
+SCALEB.6:    EQU     0x7956
+SCALEB.5:    EQU     0x7955
+SCALEB.4:    EQU     0x7954
+SCALEB.3:    EQU     0x7953
+SCALEB.2:    EQU     0x7952
+SCALEB.1:    EQU     0x7951
+SCALEB.0:    EQU     0x7950
+
+LOGB.15:     EQU     0x794F
+LOGB.14:     EQU     0x794E
+LOGB.13:     EQU     0x794D
+LOGB.12:     EQU     0x794C
+LOGB.11:     EQU     0x794B
+LOGB.10:     EQU     0x794A
+LOGB.9:      EQU     0x7949
+LOGB.8:      EQU     0x7948
+LOGB.7:      EQU     0x7947
+LOGB.6:      EQU     0x7946
+LOGB.5:      EQU     0x7945
+LOGB.4:      EQU     0x7944
+LOGB.3:      EQU     0x7943
+LOGB.2:      EQU     0x7942
+LOGB.1:      EQU     0x7941
+LOGB.0:      EQU     0x7940
+
+nextUp.15:   EQU     0x793F      
+nextUp.14:   EQU     0x793E
+nextUp.13:   EQU     0x793D
+nextUp.12:   EQU     0x793C
+nextUp.11:   EQU     0x793B
+nextUp.10:   EQU     0x793A
+nextUp.9:    EQU     0x7939
+nextUp.8:    EQU     0x7938
+nextUp.7:    EQU     0x7937      
+nextUp.6:    EQU     0x7936
+nextUp.5:    EQU     0x7935
+nextUp.4:    EQU     0x7934
+nextUp.3:    EQU     0x7933
+nextUp.2:    EQU     0x7932
+nextUp.1:    EQU     0x7931
+nextUp.0:    EQU     0x7930
+
+nextDwn.15:  EQU     0x792F
+nextDwn.14:  EQU     0x792E
+nextDwn.13:  EQU     0x792D
+nextDwn.12:  EQU     0x792C
+nextDwn.11:  EQU     0x792B
+nextDwn.10:  EQU     0x792A
+nextDwn.9:   EQU     0x7929
+nextDwn.8:   EQU     0x7928
+nextDwn.7:   EQU     0x7927
+nextDwn.6:   EQU     0x7926
+nextDwn.5:   EQU     0x7925
+nextDwn.4:   EQU     0x7924
+nextDwn.3:   EQU     0x7923
+nextDwn.2:   EQU     0x7922
+nextDwn.1:   EQU     0x7921
+nextDwn.0:   EQU     0x7920
+
+maxNumMg.15: EQU     0x791F                             
+maxNumMg.14: EQU     0x791E                             
+maxNumMg.13: EQU     0x791D                             
+maxNumMg.12: EQU     0x791C 
+maxNumMg.11: EQU     0x791B                             
+maxNumMg.10: EQU     0x791A                             
+maxNumMg.9:  EQU     0x7919                             
+maxNumMg.8:  EQU     0x7918 
+maxNumMg.7:  EQU     0x7917                             
+maxNumMg.6:  EQU     0x7916                             
+maxNumMg.5:  EQU     0x7915                             
+maxNumMg.4:  EQU     0x7914 
+maxNumMg.3:  EQU     0x7913                             
+maxNumMg.2:  EQU     0x7912                             
+maxNumMg.1:  EQU     0x7911                             
+maxNumMg.0:  EQU     0x7910 
+                       
+minNumMg.15: EQU     0x790F                            
+minNumMg.14: EQU     0x790E                            
+minNumMg.13: EQU     0x790D                            
+minNumMg.12: EQU     0x790C 
+minNumMg.11: EQU     0x790B                            
+minNumMg.10: EQU     0x790A                            
+minNumMg.9:  EQU     0x7909                            
+minNumMg.8:  EQU     0x7908 
+minNumMg.7:  EQU     0x7907                            
+minNumMg.6:  EQU     0x7906                            
+minNumMg.5:  EQU     0x7905                            
+minNumMg.4:  EQU     0x7904 
+minNumMg.3:  EQU     0x7903                            
+minNumMg.2:  EQU     0x7902                            
+minNumMg.1:  EQU     0x7901                            
+minNumMg.0:  EQU     0x7900 
+                            
+maxNum.15:   EQU     0x78FF                         
+maxNum.14:   EQU     0x78FE                         
+maxNum.13:   EQU     0x78FD                         
+maxNum.12:   EQU     0x78FC 
+maxNum.11:   EQU     0x78FB                         
+maxNum.10:   EQU     0x78FA                         
+maxNum.9:    EQU     0x78F9                         
+maxNum.8:    EQU     0x78F8 
+maxNum.7:    EQU     0x78F7                         
+maxNum.6:    EQU     0x78F6                         
+maxNum.5:    EQU     0x78F5                         
+maxNum.4:    EQU     0x78F4 
+maxNum.3:    EQU     0x78F3                         
+maxNum.2:    EQU     0x78F2                         
+maxNum.1:    EQU     0x78F1                         
+maxNum.0:    EQU     0x78F0 
+                           
+minNum.15:   EQU     0x78EF                          
+minNum.14:   EQU     0x78EE                          
+minNum.13:   EQU     0x78ED                          
+minNum.12:   EQU     0x78EC                          
+minNum.11:   EQU     0x78EB                          
+minNum.10:   EQU     0x78EA                          
+minNum.9:    EQU     0x78E9                          
+minNum.8:    EQU     0x78E8                          
+minNum.7:    EQU     0x78E7                          
+minNum.6:    EQU     0x78E6                          
+minNum.5:    EQU     0x78E5                          
+minNum.4:    EQU     0x78E4                          
+minNum.3:    EQU     0x78E3                          
+minNum.2:    EQU     0x78E2                          
+minNum.1:    EQU     0x78E1                          
+minNum.0:    EQU     0x78E0                          
+                        
+copy.15:     EQU     0x78DF      
+copy.14:     EQU     0x78DE
+copy.13:     EQU     0x78DD
+copy.12:     EQU     0x78DC
+copy.11:     EQU     0x78DB      
+copy.10:     EQU     0x78DA
+copy.9:      EQU     0x78D9
+copy.8:      EQU     0x78D8
+copy.7:      EQU     0x78D7      
+copy.6:      EQU     0x78D6
+copy.5:      EQU     0x78D5
+copy.4:      EQU     0x78D4
+copy.3:      EQU     0x78D3      
+copy.2:      EQU     0x78D2
+copy.1:      EQU     0x78D1
+copy.0:      EQU     0x78D0
+
+negate.15:   EQU     0x78CF
+negate.14:   EQU     0x78CE
+negate.13:   EQU     0x78CD
+negate.12:   EQU     0x78CC
+negate.11:   EQU     0x78CB
+negate.10:   EQU     0x78CA
+negate.9:    EQU     0x78C9
+negate.8:    EQU     0x78C8
+negate.7:    EQU     0x78C7
+negate.6:    EQU     0x78C6
+negate.5:    EQU     0x78C5
+negate.4:    EQU     0x78C4
+negate.3:    EQU     0x78C3
+negate.2:    EQU     0x78C2
+negate.1:    EQU     0x78C1
+negate.0:    EQU     0x78C0
+
+abs.15:      EQU     0x78BF
+abs.14:      EQU     0x78BE
+abs.13:      EQU     0x78BD
+abs.12:      EQU     0x78BC
+abs.11:      EQU     0x78BB
+abs.10:      EQU     0x78BA
+abs.9:       EQU     0x78B9
+abs.8:       EQU     0x78B8
+abs.7:       EQU     0x78B7
+abs.6:       EQU     0x78B6
+abs.5:       EQU     0x78B5
+abs.4:       EQU     0x78B4
+abs.3:       EQU     0x78B3
+abs.2:       EQU     0x78B2
+abs.1:       EQU     0x78B1
+abs.0:       EQU     0x78B0
+
+copySign.15: EQU     0x78AF
+copySign.14: EQU     0x78AE
+copySign.13: EQU     0x78AD
+copySign.12: EQU     0x78AC
+copySign.11: EQU     0x78AB
+copySign.10: EQU     0x78AA
+copySign.9:  EQU     0x78A9
+copySign.8:  EQU     0x78A8
+copySign.7:  EQU     0x78A7
+copySign.6:  EQU     0x78A6
+copySign.5:  EQU     0x78A5
+copySign.4:  EQU     0x78A4
+copySign.3:  EQU     0x78A3
+copySign.2:  EQU     0x78A2
+copySign.1:  EQU     0x78A1
+copySign.0:  EQU     0x78A0
+
+REM.31:      EQU     0x789F
+REM.30:      EQU     0x789E
+REM.29:      EQU     0x789D
+REM.28:      EQU     0x789C
+REM.27:      EQU     0x789B
+REM.26:      EQU     0x789A
+REM.25:      EQU     0x7899
+REM.24:      EQU     0x7898
+REM.23:      EQU     0x7897
+REM.22:      EQU     0x7896
+REM.21:      EQU     0x7895
+REM.20:      EQU     0x7894
+REM.19:      EQU     0x7893
+REM.18:      EQU     0x7892
+REM.17:      EQU     0x7891
+REM.16:      EQU     0x7890
+REM.15:      EQU     0x788F
+REM.14:      EQU     0x788E
+REM.13:      EQU     0x788D
+REM.12:      EQU     0x788C
+REM.11:      EQU     0x788B
+REM.10:      EQU     0x788A
+REM.9:       EQU     0x7889
+REM.8:       EQU     0x7888
+REM.7:       EQU     0x7887
+REM.6:       EQU     0x7886
+REM.5:       EQU     0x7885
+REM.4:       EQU     0x7884
+REM.3:       EQU     0x7883
+REM.2:       EQU     0x7882
+REM.1:       EQU     0x7881
+REM.0:       EQU     0x7880
+
+SQRT.31:     EQU     0x787F
+SQRT.30:     EQU     0x787E
+SQRT.29:     EQU     0x787D
+SQRT.28:     EQU     0x787C
+SQRT.27:     EQU     0x787B
+SQRT.26:     EQU     0x787A
+SQRT.25:     EQU     0x7879
+SQRT.24:     EQU     0x7878
+SQRT.23:     EQU     0x7877
+SQRT.22:     EQU     0x7876
+SQRT.21:     EQU     0x7875
+SQRT.20:     EQU     0x7874
+SQRT.19:     EQU     0x7873
+SQRT.18:     EQU     0x7872
+SQRT.17:     EQU     0x7871
+SQRT.16:     EQU     0x7870
+SQRT.15:     EQU     0x786F
+SQRT.14:     EQU     0x786E
+SQRT.13:     EQU     0x786D
+SQRT.12:     EQU     0x786C
+SQRT.11:     EQU     0x786B
+SQRT.10:     EQU     0x786A
+SQRT.9:      EQU     0x7869
+SQRT.8:      EQU     0x7868
+SQRT.7:      EQU     0x7867
+SQRT.6:      EQU     0x7866
+SQRT.5:      EQU     0x7865
+SQRT.4:      EQU     0x7864
+SQRT.3:      EQU     0x7863
+SQRT.2:      EQU     0x7862
+SQRT.1:      EQU     0x7861
+SQRT.0:      EQU     0x7860
+
+FDIV.15:     EQU     0x785F
+FDIV.14:     EQU     0x785E
+FDIV.13:     EQU     0x785D
+FDIV.12:     EQU     0x785C
+FDIV.11:     EQU     0x785B
+FDIV.10:     EQU     0x785A
+FDIV.9:      EQU     0x7859
+FDIV.8:      EQU     0x7858
+FDIV.7:      EQU     0x7857
+FDIV.6:      EQU     0x7856
+FDIV.5:      EQU     0x7855
+FDIV.4:      EQU     0x7854
+FDIV.3:      EQU     0x7853
+FDIV.2:      EQU     0x7852
+FDIV.1:      EQU     0x7851
+FDIV.0:      EQU     0x7850
+
+C.15:        EQU     0x784F
+C.14:        EQU     0x784E
+C.13:        EQU     0x784D
+C.12:        EQU     0x784C
+C.11:        EQU     0x784B
+C.10:        EQU     0x784A
+C.9:         EQU     0x7849
+C.8:         EQU     0x7848
+C.7:         EQU     0x7847
+C.6:         EQU     0x7846
+C.5:         EQU     0x7845
+C.4:         EQU     0x7844
+C.3:         EQU     0x7843
+C.2:         EQU     0x7842
+C.1:         EQU     0x7841
+C.0:         EQU     0x7840
+
+FMA.15:      EQU     0x783F
+FMA.14:      EQU     0x783E
+FMA.13:      EQU     0x783D
+FMA.12:      EQU     0x783C
+FMA.11:      EQU     0x783B
+FMA.10:      EQU     0x783A
+FMA.9:       EQU     0x7839
+FMA.8:       EQU     0x7838
+FMA.7:       EQU     0x7837
+FMA.6:       EQU     0x7836
+FMA.5:       EQU     0x7835
+FMA.4:       EQU     0x7834
+FMA.3:       EQU     0x7833
+FMA.2:       EQU     0x7832
+FMA.1:       EQU     0x7831
+FMA.0:       EQU     0x7830
+
+FMUL.15:     EQU     0x782F
+FMUL.14:     EQU     0x782E
+FMUL.13:     EQU     0x782D
+FMUL.12:     EQU     0x782C
+FMUL.11:     EQU     0x782B
+FMUL.10:     EQU     0x782A
+FMUL.9:      EQU     0x7829
+FMUL.8:      EQU     0x7828
+FMUL.7:      EQU     0x7827
+FMUL.6:      EQU     0x7826
+FMUL.5:      EQU     0x7825
+FMUL.4:      EQU     0x7824
+FMUL.3:      EQU     0x7823
+FMUL.2:      EQU     0x7822
+FMUL.1:      EQU     0x7821
+FMUL.0:      EQU     0x7820
+
+FSUB.15:     EQU     0x781F
+FSUB.14:     EQU     0x781E
+FSUB.13:     EQU     0x781D
+FSUB.12:     EQU     0x781C
+FSUB.11:     EQU     0x781B
+FSUB.10:     EQU     0x781A
+FSUB.9:      EQU     0x7819
+FSUB.8:      EQU     0x7818
+FSUB.7:      EQU     0x7817
+FSUB.6:      EQU     0x7816
+FSUB.5:      EQU     0x7815
+FSUB.4:      EQU     0x7814
+FSUB.3:      EQU     0x7813
+FSUB.2:      EQU     0x7812
+FSUB.1:      EQU     0x7811
+FSUB.0:      EQU     0x7810
+
+FADD.15:     EQU     0x780F
+FADD.14:     EQU     0x780E
+FADD.13:     EQU     0x780D
+FADD.12:     EQU     0x780C
+FADD.11:     EQU     0x780B
+FADD.10:     EQU     0x780A
+FADD.9:      EQU     0x7809
+FADD.8:      EQU     0x7808
+FADD.7:      EQU     0x7807
+FADD.6:      EQU     0x7806
+FADD.5:      EQU     0x7805
+FADD.4:      EQU     0x7804
+FADD.3:      EQU     0x7803
+FADD.2:      EQU     0x7802
+FADD.1:      EQU     0x7801
+FADD.0:      EQU     0x7800
+
+;--------------------------------------------------------------------------
+;STATUS Register flags and respective bit positions
+;--------------------------------------------------------------------------
+
+subs_AbruptUndrFl: EQU 63
+subs_X:            EQU 62
+subs_Xor_X:        EQU 61
+subs_NXACT:        EQU 50
+subs_UNFL:         EQU 59
+subs_OVFL:         EQU 58
+subs_DIVBY0:       EQU 57
+subs_INV:          EQU 56
+                        
+DEF_ONLY:          EQU 55
+AWAY:              EQU 54     ;0=default is round nearest even; 1=default is round Away; 
+RM_attrib:         EQU 53     ;0=use 2-bit RM code in instruction; 1=force all rounding according to specifier code in bits 55 and 56
+RM1:               EQU 52     ;msb of forced rounding mode
+RM0:               EQU 51     ;lsb of forced rounding mode    00=default, 01=positive, 10=negative, 11=zero
+
+compareTrue:       EQU 50
+isTrue:            EQU 49
+aFlagRaised:       EQU 48
+totlOrderMag:      EQU 47
+totlOrder:         EQU 46
+
+positiveInfinity:  EQU 45
+positiveNormal:    EQU 44
+positiveSubnormal: EQU 43
+positiveZero:      EQU 42
+negativeZero:      EQU 41
+negativeSubnormal: EQU 40
+negativeNormal:    EQU 39
+negativeInfinity:  EQU 38
+quietNaN:          EQU 37
+signalingNaN:      EQU 36 
+                      
+AltImmInexact:     EQU 35
+AltImmUnderflow:   EQU 34
+AltImmOverflow:    EQU 33
+AltImmDivByZero:   EQU 32
+AltImmInvalid:     EQU 31
+
+RNF_NXACT:         EQU 30
+RNF_UNFL:          EQU 29
+RNF_OVFL:          EQU 28
+RNF_DIVBY0:        EQU 27
+RNF_INV:           EQU 26
+
+NXACTflag:         EQU 25
+UNFLflag:          EQU 24
+OVFLflag:          EQU 23
+DIVBY0flag:        EQU 22   
+INVflag:           EQU 21
+ 
+NXACTsignal:       EQU 20
+UNFLsignal:        EQU 19
+OVFLsignal:        EQU 18
+DIVBY0signal:      EQU 17
+INVsignal:         EQU 16
+
+spare4:            EQU 15
+spare3:            EQU 14
+spare2:            EQU 13
+spare1:            EQU 12
+spare0:            EQU 11
+
+IRQ:               EQU 10   ;interrupt request input        read-only
+ExcSource:         EQU 9   ;source of an exception signal 0=operandA 1=operandB
+
+A_GTE_B:           EQU 8   ;1 = (A>=B)  notV_or_Z           read-only
+A_LTE_B:           EQU 7   ;1 = (A<=B)  ZorV                read-only
+A_GT_B:            EQU 6   ;1 = (A>B)   notV_and_notZ       read-only
+
+IRQEN:             EQU 5    ;interrupt enable bit position
+DONE:              EQU 4
+V:                 EQU 3   ;1 = (A<B)
+N:                 EQU 2
+C:                 EQU 1
+Z:                 EQU 0   ;1 = (A==B)
+
+invalid:           EQU 0x01
+divByZero:         EQU 0x02
+overflow:          EQU 0x04
+underflow:         EQU 0x08
+inexact:           EQU 0x10
+
+Zbit:              EQU 0x01
+Cbit:              EQU 0x02
+Nbit:              EQU 0x04
+Vbit:              EQU 0x08
+DoneBit:           EQU 0x10
+intEnable:         EQU 0x20
+
+bit63: equ 63
+bit62: equ 62
+bit61: equ 61
+bit60: equ 60
+bit59: equ 59
+bit58: equ 58
+bit57: equ 57
+bit56: equ 56
+bit55: equ 55
+bit54: equ 54
+bit53: equ 53
+bit52: equ 52
+bit51: equ 51
+bit50: equ 50
+bit49: equ 49
+bit48: equ 48
+bit47: equ 47
+bit46: equ 46
+bit45: equ 45
+bit44: equ 44
+bit43: equ 43
+bit42: equ 42
+bit41: equ 41
+bit40: equ 40
+bit39: equ 39
+bit38: equ 38
+bit37: equ 37
+bit36: equ 36
+bit35: equ 35
+bit34: equ 34
+bit33: equ 33
+bit32: equ 32
+bit31: equ 31
+bit30: equ 30
+bit29: equ 29
+bit28: equ 28
+bit27: equ 27
+bit26: equ 26
+bit25: equ 25
+bit24: equ 24
+bit23: equ 23
+bit22: equ 22
+bit21: equ 21
+bit20: equ 20
+bit19: equ 19
+bit18: equ 18
+bit17: equ 17
+bit16: equ 16
+bit15: equ 15
+bit14: equ 14
+bit13: equ 13
+bit12: equ 12
+bit11: equ 11
+bit10: equ 10
+bit9:  equ  9
+bit8:  equ  8
+bit7:  equ  7
+bit6:  equ  6
+bit5:  equ  5
+bit4:  equ  4
+bit3:  equ  3
+bit2:  equ  2
+bit1:  equ  1
+bit0:  equ  0
+                    
+XCU.0      EQU     0x0        ;extra compute unit 0 to 15  lable used by XCU push and pull operators
+XCU.1      EQU     0x1
+XCU.2      EQU     0x2
+XCU.3      EQU     0x3
+XCU.4      EQU     0x4
+XCU.5      EQU     0x5
+XCU.6      EQU     0x6
+XCU.7      EQU     0x7
+XCU.8      EQU     0x8
+XCU.9      EQU     0x9
+XCU.10     EQU     0xA
+XCU.11     EQU     0xB
+XCU.12     EQU     0xC
+XCU.13     EQU     0xD
+XCU.14     EQU     0xE
+XCU.15     EQU     0xF
+
+XCU0       EQU     0x0001      ;bit positions in XCU control register for reseting, breaking, ssteping, and preempting target XCUs
+XCU1       EQU     0x0002
+XCU2       EQU     0x0004
+XCU3       EQU     0x0008
+XCU4       EQU     0x0010
+XCU5       EQU     0x0020
+XCU6       EQU     0x0040
+XCU7       EQU     0x0080
+XCU8       EQU     0x0100
+XCU9       EQU     0x0200
+XCU10      EQU     0x0400
+XCU11      EQU     0x0800
+XCU12      EQU     0x1000
+XCU13      EQU     0x2000
+XCU14      EQU     0x4000
+XCU15      EQU     0x8000
+
+

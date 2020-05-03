@@ -1,0 +1,636 @@
+                                ;//
+                                ;// Author:  Jerry D. Harthcock
+                                ;// Version:  1.22  May 3, 2020
+                                ;// Copyright (C) 2020.  All rights reserved.
+                                ;//
+                                ;////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                                ;//                                                                                                                    //
+                                ;//                                                    Open-Source                                                     //
+                                ;//                          HedgeHog Fused Spiking Neural Network Emulator/Compute Engine                             //
+                                ;//                                          Limited Use Commercial License                                            //
+                                ;//                                                                                                                    //
+                                ;//                                                                                                                    //
+                                ;// Open-source means:  this source code and this instruction set ("this IP") may be freely downloaded, copied,        //
+                                ;// modified, distributed and used in accordance with the terms and conditons of the licenses provided herein.         //
+                                ;//                                                                                                                    //
+                                ;// Provided that you comply with all the terms and conditions set forth herein, Jerry D. Harthcock ("licensor"),      //
+                                ;// the original author and exclusive copyright owner of this HedgeHog Fused Spiking Neural Network Emulator/Compute   //
+                                ;// Engine, including related development software ("this IP"), hereby grants to recipient of this IP ("licensee"),    //
+                                ;// a world-wide, paid-up, non-exclusive license to implement and commercially use this IP within the programmable     //
+                                ;// fabric of Xilinx Kintex Ultra Plus brand FPGAs--only.                                                              //
+                                ;//                                                                                                                    //
+                                ;// Furthermore, limited to the purposes of prototyping, evaluation, characterization and testing of implementations   //
+                                ;// in a hard, custom or semi-custom ASIC, any university or institution of higher education may have their            //
+                                ;// implementation of this IP produced for said limited purposes at any foundary of their choosing provided that such  //
+                                ;// prototypes do not ever wind up in commercial circulation, with this license extending to such foundary and is in   //
+                                ;// connection with said academic pursuit under the supervision of said university or institution of higher education. //
+                                ;//                                                                                                                    //
+                                ;// Any copying, distribution, customization, modification, or derivative work of this IP must include an exact copy   //
+                                ;// of this license and original copyright notice at the very top of each source file and any derived netlist, and,    //
+                                ;// in the case of binaries, a printed copy of this license and/or a text format copy in a separate file distributed   //
+                                ;// with said netlists or binary files having the file name, "LICENSE.txt".  You, the licensee, also agree not to      //
+                                ;// remove any copyright notices from any source file covered or distributed under this Limited Use Commercial License.//                               //
+                                ;//                                                                                                                    //
+                                ;// LICENSOR DOES NOT WARRANT OR GUARANTEE THAT YOUR USE OF THIS IP WILL NOT INFRINGE THE RIGHTS OF OTHERS OR          //
+                                ;// THAT IT IS SUITABLE OR FIT FOR ANY PURPOSE AND THAT YOU, THE LICENSEE, AGREE TO HOLD LICENSOR HARMLESS FROM        //
+                                ;// ANY CLAIM BROUGHT BY YOU OR ANY THIRD PARTY FOR YOUR SUCH USE.                                                     //
+                                ;//                                                                                                                    //
+                                ;// Licensor reserves all his rights, including, but in no way limited to, the right to change or modify the terms     //
+                                ;// and conditions of this Limited Use Commercial License anytime without notice of any kind to anyone.                //
+                                ;// By using this IP for any purpose, licensee agrees to all the terms and conditions set forth in this Limited Use    //
+                                ;// Commercial License.                                                                                                //
+                                ;//                                                                                                                    //
+                                ;// This Limited Use Commercial License does not include the right to implement or commercially use this IP or any     //
+                                ;// IP derived from this IP in any device other than Xilinx Kintex Ultra Plus brand FPGAs. If you would like to obtain //
+                                ;// such a license, please contact Licensor.                                                                           //
+                                ;//                                                                                                                    //
+                                ;// Licensor can be contacted at:  SYMPL.gpu@gmail.com or Jerry.Harthcock@gmail.com                                    //
+                                ;//                                                                                                                    //
+                                ;////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                                
+ 00000000                                  CPU  "SYMPL64.TBL"
+ 00000000                                  HOF  "bin32"
+ 00000000                                  WDLN 8
+                                
+                                
+ 00102000         =             expTimeBuff:   equ  0x00102000     ;  0x00110000-0x00117FFF  exponentiated time (for possible use with SoftMax, etc)
+ 00101000         =             slopeBuff:     equ  0x00101000     ;  0x00108000-0x0010FFFF  slope (direction and amount from previous) buffer
+ 00100000         =             errBuff:       equ  0x00100000     ;  0x00100000-0x00107FFF  error (distance from firing threshold) buffer
+ 000C0000         =             dendBuff:      equ  0x000C0000     ;  0x000C0000-0x000FFFFF  dendrite front-end result buffer
+ 00080000         =             ratesMem:      equ  0x00080000     ;  0x00080000-0x0008FFFF  charging rates memory
+ 00040000         =             binWeightsMem: equ  0x00040000     ;  0x00040000-0x0007FFFF  binary floating-point weights memory
+ 00018000         =             threshMem:     equ  0x00018000     ;  0x00018000-0x0001FFFF  binary floating-point thresholds memory
+ 00010000         =             accumSums:     equ  0x00010000     ;  0x00010000-0x00017FFF  accumulated sums memory
+ 00008000         =             spikeOutMem:   equ  0x00008000     ;  0x00008000-0x0000FFFF  spike output/result storage memory
+ 00004000         =             SNNinput:      equ  0x00004000     ;  0x00004000-0x00004FFF  SNN spike train target input
+ 00002000         =             spikeSrcMem:   equ  0x00002000     ;  0x00002000-0x00003FFF  spike train source storage
+                                
+ 00003F40         =             _1.25:         equ  0x3F40         ;  binary7/8 representation of 1.25 decimal                  
+ 00004040         =             _2.5:          equ  0x4040         ;  binary7/8 representation of 2.5 decimal  
+ 00004080         =             _3.0:          equ  0x4080         ;                
+ 000040C0         =             _3.5:          equ  0x40C0         ;                
+ 000040E0         =             _3.75:         equ  0x40E0         ;                
+ 00004100         =             _4.0:          equ  0x4100         ;  binary7/8 representation of 4.00 decimal
+                                
+ 00000000                                   org     0x0              
+                                
+ 00000000                       Constants:  
+ 00000000 0000000000000004      prog_entry: DFL     0, initialize      ;entry point for this program
+ 00000001 0000000000000013      prog_len:   DFL     0, progend         ;the present convention is location 0x00001 is the program/thread length
+                                
+ 00000002                                   org     $         ;default interrupt vector locations
+ 00000002 307CDD0000000010      done:       _       _1:setDVNCZ = _1:#DoneBit          ;set Done bit
+ 00000003 127FF30000000000                  _       _4:PCC = (_1:0x00, 0, $)           ;s/w break here  (note: $ is current PC)
+ 00000004 307CDC0000000010      initialize: _       _1:clrDVNCZ = _1:#DoneBit          ;clear the Done bit to tell the world we are now busy
+ 00000005 327FF72000080000                  _       _4:AR0 = _4:#ratesMem              ;point to input 0 charge rates memory
+ 00000006 317FEF100000003F                  _       _2:REPEAT = _2:#63                 ;initialize all input charge rates to the value 6
+ 00000007 3080080000000006                  _       _1:*AR0++[1] = _1:#6               ;6=roughly 16-tick input charge rate
+ 00000008 327FF82000018000                  _       _4:AR1 = _4:#threshMem             ;point to input 0 threshold memory
+ 00000009 317FEF1000000007                  _       _2:REPEAT = _2:#7                  ;initialize all input thresholds to the value 1.25
+                                ;            _       _2:*AR1++[1] = _2:#_2.25           ;something slightly more than 2.0
+                                ;            _       _2:*AR1++[1] = _2:#_4.0            ;something around 4.0
+                                ;            _       _2:*AR1++[1] = _2:#_3.5            ;something around 3.0
+ 0000000A 31800910000040E0                  _       _2:*AR1++[1] = _2:#_3.75            ;something around 3.0
+                                            
+ 0000000B                       pushSpikes: 
+                                          ;  _       _4:AR2 = _4:#binWeightsMem         ;point to weights vector
+ 0000000B 327FFA2000002000                  _       _4:AR3 = _4:#spikeSrcMem           ;point to input spike train source buffer location
+ 0000000C 327FFB2000004000                  _       _4:AR4 = _4:#SNNinput              ;point to SNN spike train target input
+ 0000000D 317FEF100000001F                  _       _2:REPEAT = _2:#31                 ;input spike train is 16 ticks deep in this example
+ 0000000E 80800C0800B70000                  ACT     _1:*AR4++[1] = (_1:*AR3++[1], _128:0) ;push the spike train and 
+                                                                                       ;specified weights,rates, thresholdsinto SNN input
+ 0000000F 0000000000000000                  _
+ 00000010 3A7FF52000000002                  _  s4:PC = _4:#done           ;go back to done--unconditional load of PC with absolute address
+ 00000011 0000000000000000                  _
+ 00000012 0000000000000000                  _
+ 00000013                       progend:
+                                
+ 00000000                                 end
+000078B0  ABS.0              000078B1  ABS.1              000078BA  ABS.10             
+000078BB  ABS.11             000078BC  ABS.12             000078BD  ABS.13             
+000078BE  ABS.14             000078BF  ABS.15             000078B2  ABS.2              
+000078B3  ABS.3              000078B4  ABS.4              000078B5  ABS.5              
+000078B6  ABS.6              000078B7  ABS.7              000078B8  ABS.8              
+000078B9  ABS.9              00010000  ACCUMSUMS          00007FCD  ACTMODE            
+00007EC0  ADD.0              00007EC1  ADD.1              00007ECA  ADD.10             
+00007ECB  ADD.11             00007ECC  ADD.12             00007ECD  ADD.13             
+00007ECE  ADD.14             00007ECF  ADD.15             00007EC2  ADD.2              
+00007EC3  ADD.3              00007EC4  ADD.4              00007EC5  ADD.5              
+00007EC6  ADD.6              00007EC7  ADD.7              00007EC8  ADD.8              
+00007EC9  ADD.9              00007EB0  ADDC.0             00007EB1  ADDC.1             
+00007EBA  ADDC.10            00007EBB  ADDC.11            00007EBC  ADDC.12            
+00007EBD  ADDC.13            00007EBE  ADDC.14            00007EBF  ADDC.15            
+00007EB2  ADDC.2             00007EB3  ADDC.3             00007EB4  ADDC.4             
+00007EB5  ADDC.5             00007EB6  ADDC.6             00007EB7  ADDC.7             
+00007EB8  ADDC.8             00007EB9  ADDC.9             00000030  AFLAGRAISED        
+00000020  ALTIMMDIVBYZERO    00000023  ALTIMMINEXACT      0000001F  ALTIMMINVALID      
+00000021  ALTIMMOVERFLOW     00000022  ALTIMMUNDERFLOW    00007EF0  AND.0              
+00007EF1  AND.1              00007EFA  AND.10             00007EFB  AND.11             
+00007EFC  AND.12             00007EFD  AND.13             00007EFE  AND.14             
+00007EFF  AND.15             00007EF2  AND.2              00007EF3  AND.3              
+00007EF4  AND.4              00007EF5  AND.5              00007EF6  AND.6              
+00007EF7  AND.7              00007EF8  AND.8              00007EF9  AND.9              
+00007FF7  AR0                00007FF8  AR1                00007FF9  AR2                
+00007FFA  AR3                00007FFB  AR4                00007FFC  AR5                
+00007FFD  AR6                00000036  AWAY               00000008  A_GTE_B            
+00000006  A_GT_B             00000007  A_LTE_B            00007E20  BCLR.0             
+00007E21  BCLR.1             00007E2A  BCLR.10            00007E2B  BCLR.11            
+00007E2C  BCLR.12            00007E2D  BCLR.13            00007E2E  BCLR.14            
+00007E2F  BCLR.15            00007E22  BCLR.2             00007E23  BCLR.3             
+00007E24  BCLR.4             00007E25  BCLR.5             00007E26  BCLR.6             
+00007E27  BCLR.7             00007E28  BCLR.8             00007E29  BCLR.9             
+00040000  BINWEIGHTSMEM      00000000  BIT0               00000001  BIT1               
+0000000A  BIT10              0000000B  BIT11              0000000C  BIT12              
+0000000D  BIT13              0000000E  BIT14              0000000F  BIT15              
+00000010  BIT16              00000011  BIT17              00000012  BIT18              
+00000013  BIT19              00000002  BIT2               00000014  BIT20              
+00000015  BIT21              00000016  BIT22              00000017  BIT23              
+00000018  BIT24              00000019  BIT25              0000001A  BIT26              
+0000001B  BIT27              0000001C  BIT28              0000001D  BIT29              
+00000003  BIT3               0000001E  BIT30              0000001F  BIT31              
+00000020  BIT32              00000021  BIT33              00000022  BIT34              
+00000023  BIT35              00000024  BIT36              00000025  BIT37              
+00000026  BIT38              00000027  BIT39              00000004  BIT4               
+00000028  BIT40              00000029  BIT41              0000002A  BIT42              
+0000002B  BIT43              0000002C  BIT44              0000002D  BIT45              
+0000002E  BIT46              0000002F  BIT47              00000030  BIT48              
+00000031  BIT49              00000005  BIT5               00000032  BIT50              
+00000033  BIT51              00000034  BIT52              00000035  BIT53              
+00000036  BIT54              00000037  BIT55              00000038  BIT56              
+00000039  BIT57              0000003A  BIT58              0000003B  BIT59              
+00000006  BIT6               0000003C  BIT60              0000003D  BIT61              
+0000003E  BIT62              0000003F  BIT63              00000007  BIT7               
+00000008  BIT8               00000009  BIT9               00007E30  BSET.0             
+00007E31  BSET.1             00007E3A  BSET.10            00007E3B  BSET.11            
+00007E3C  BSET.12            00007E3D  BSET.13            00007E3E  BSET.14            
+00007E3F  BSET.15            00007E32  BSET.2             00007E33  BSET.3             
+00007E34  BSET.4             00007E35  BSET.5             00007E36  BSET.6             
+00007E37  BSET.7             00007E38  BSET.8             00007E39  BSET.9             
+00000001  C                  00007840  C.0                00007841  C.1                
+0000784A  C.10               0000784B  C.11               0000784C  C.12               
+0000784D  C.13               0000784E  C.14               0000784F  C.15               
+00007842  C.2                00007843  C.3                00007844  C.4                
+00007845  C.5                00007846  C.6                00007847  C.7                
+00007848  C.8                00007849  C.9                00007FDA  CAPTURE0           
+00007FDB  CAPTURE1           00007FDC  CAPTURE2           00007FDD  CAPTURE3           
+00000002  CBIT               00007960  CFI.0              00007961  CFI.1              
+0000796A  CFI.10             0000796B  CFI.11             0000796C  CFI.12             
+0000796D  CFI.13             0000796E  CFI.14             0000796F  CFI.15             
+00007962  CFI.2              00007963  CFI.3              00007964  CFI.4              
+00007965  CFI.5              00007966  CFI.6              00007967  CFI.7              
+00007968  CFI.8              00007969  CFI.9              00007FD6  CLASS              
+00007CDA  CLRALTIMM          00007CDC  CLRDVNCZ           00007CDE  CLRSUBSTT          
+00007CFE  CMPQE              00007CFA  CMPQG              00007CF8  CMPQGE             
+00007CEC  CMPQGU             00007CF6  CMPQL              00007CF4  CMPQLE             
+00007CF0  CMPQLU             00007CFC  CMPQNE             00007CF2  CMPQNG             
+00007CEE  CMPQNL             00007CEA  CMPQO              00007CEB  CMPQU              
+00007CFF  CMPSE              00007CFB  CMPSG              00007CF9  CMPSGE             
+00007CED  CMPSGU             00007CF7  CMPSL              00007CF5  CMPSLE             
+00007CF1  CMPSLU             00007CFD  CMPSNE             00007CF3  CMPSNG             
+00007CEF  CMPSNL             00007E00  CNVFBTA.0          00007E01  CNVFBTA.1          
+00007E0A  CNVFBTA.10         00007E0B  CNVFBTA.11         00007E0C  CNVFBTA.12         
+00007E0D  CNVFBTA.13         00007E0E  CNVFBTA.14         00007E0F  CNVFBTA.15         
+00007E02  CNVFBTA.2          00007E03  CNVFBTA.3          00007E04  CNVFBTA.4          
+00007E05  CNVFBTA.5          00007E06  CNVFBTA.6          00007E07  CNVFBTA.7          
+00007E08  CNVFBTA.8          00007E09  CNVFBTA.9          00007AC0  CNVFDCS.0          
+00007AC1  CNVFDCS.1          00007ACA  CNVFDCS.10         00007ACB  CNVFDCS.11         
+00007ACC  CNVFDCS.12         00007ACD  CNVFDCS.13         00007ACE  CNVFDCS.14         
+00007ACF  CNVFDCS.15         00007AD0  CNVFDCS.16         00007AD1  CNVFDCS.17         
+00007AD2  CNVFDCS.18         00007AD3  CNVFDCS.19         00007AC2  CNVFDCS.2          
+00007AD4  CNVFDCS.20         00007AD5  CNVFDCS.21         00007AD6  CNVFDCS.22         
+00007AD7  CNVFDCS.23         00007AD8  CNVFDCS.24         00007AD9  CNVFDCS.25         
+00007ADA  CNVFDCS.26         00007ADB  CNVFDCS.27         00007ADC  CNVFDCS.28         
+00007ADD  CNVFDCS.29         00007AC3  CNVFDCS.3          00007ADE  CNVFDCS.30         
+00007ADF  CNVFDCS.31         00007AC4  CNVFDCS.4          00007AC5  CNVFDCS.5          
+00007AC6  CNVFDCS.6          00007AC7  CNVFDCS.7          00007AC8  CNVFDCS.8          
+00007AC9  CNVFDCS.9          00007A90  CNVFHCS.0          00007A91  CNVFHCS.1          
+00007A9A  CNVFHCS.10         00007A9B  CNVFHCS.11         00007A9C  CNVFHCS.12         
+00007A9D  CNVFHCS.13         00007A9E  CNVFHCS.14         00007A9F  CNVFHCS.15         
+00007A92  CNVFHCS.2          00007A93  CNVFHCS.3          00007A94  CNVFHCS.4          
+00007A95  CNVFHCS.5          00007A96  CNVFHCS.6          00007A97  CNVFHCS.7          
+00007A98  CNVFHCS.8          00007A99  CNVFHCS.9          00007DF0  CNVTBFA.0          
+00007DF1  CNVTBFA.1          00007DFA  CNVTBFA.10         00007DFB  CNVTBFA.11         
+00007DFC  CNVTBFA.12         00007DFD  CNVTBFA.13         00007DFE  CNVTBFA.14         
+00007DFF  CNVTBFA.15         00007DF2  CNVTBFA.2          00007DF3  CNVTBFA.3          
+00007DF4  CNVTBFA.4          00007DF5  CNVTBFA.5          00007DF6  CNVTBFA.6          
+00007DF7  CNVTBFA.7          00007DF8  CNVTBFA.8          00007DF9  CNVTBFA.9          
+00007AA0  CNVTDCS.0          00007AA1  CNVTDCS.1          00007AAA  CNVTDCS.10         
+00007AAB  CNVTDCS.11         00007AAC  CNVTDCS.12         00007AAD  CNVTDCS.13         
+00007AAE  CNVTDCS.14         00007AAF  CNVTDCS.15         00007AB0  CNVTDCS.16         
+00007AB1  CNVTDCS.17         00007AB2  CNVTDCS.18         00007AB3  CNVTDCS.19         
+00007AA2  CNVTDCS.2          00007AB4  CNVTDCS.20         00007AB5  CNVTDCS.21         
+00007AB6  CNVTDCS.22         00007AB7  CNVTDCS.23         00007AB8  CNVTDCS.24         
+00007AB9  CNVTDCS.25         00007ABA  CNVTDCS.26         00007ABB  CNVTDCS.27         
+00007ABC  CNVTDCS.28         00007ABD  CNVTDCS.29         00007AA3  CNVTDCS.3          
+00007ABE  CNVTDCS.30         00007ABF  CNVTDCS.31         00007AA4  CNVTDCS.4          
+00007AA5  CNVTDCS.5          00007AA6  CNVTDCS.6          00007AA7  CNVTDCS.7          
+00007AA8  CNVTDCS.8          00007AA9  CNVTDCS.9          00007A80  CNVTHCS.0          
+00007A81  CNVTHCS.1          00007A8A  CNVTHCS.10         00007A8B  CNVTHCS.11         
+00007A8C  CNVTHCS.12         00007A8D  CNVTHCS.13         00007A8E  CNVTHCS.14         
+00007A8F  CNVTHCS.15         00007A82  CNVTHCS.2          00007A83  CNVTHCS.3          
+00007A84  CNVTHCS.4          00007A85  CNVTHCS.5          00007A86  CNVTHCS.6          
+00007A87  CNVTHCS.7          00007A88  CNVTHCS.8          00007A89  CNVTHCS.9          
+00007FCF  COMPARE            00000032  COMPARETRUE        00000000  CONSTANTS          
+00007A70  CONV.0             00007A71  CONV.1             00007A7A  CONV.10            
+00007A7B  CONV.11            00007A7C  CONV.12            00007A7D  CONV.13            
+00007A7E  CONV.14            00007A7F  CONV.15            00007A72  CONV.2             
+00007A73  CONV.3             00007A74  CONV.4             00007A75  CONV.5             
+00007A76  CONV.6             00007A77  CONV.7             00007A78  CONV.8             
+00007A79  CONV.9             000078D0  COPY.0             000078D1  COPY.1             
+000078DA  COPY.10            000078DB  COPY.11            000078DC  COPY.12            
+000078DD  COPY.13            000078DE  COPY.14            000078DF  COPY.15            
+000078D2  COPY.2             000078D3  COPY.3             000078D4  COPY.4             
+000078D5  COPY.5             000078D6  COPY.6             000078D7  COPY.7             
+000078D8  COPY.8             000078D9  COPY.9             000078A0  COPYSIGN.0         
+000078A1  COPYSIGN.1         000078AA  COPYSIGN.10        000078AB  COPYSIGN.11        
+000078AC  COPYSIGN.12        000078AD  COPYSIGN.13        000078AE  COPYSIGN.14        
+000078AF  COPYSIGN.15        000078A2  COPYSIGN.2         000078A3  COPYSIGN.3         
+000078A4  COPYSIGN.4         000078A5  COPYSIGN.5         000078A6  COPYSIGN.6         
+000078A7  COPYSIGN.7         000078A8  COPYSIGN.8         000078A9  COPYSIGN.9         
+00007B40  COSD.0             00007B41  COSD.1             00007B4A  COSD.10            
+00007B4B  COSD.11            00007B4C  COSD.12            00007B4D  COSD.13            
+00007B4E  COSD.14            00007B4F  COSD.15            00007B42  COSD.2             
+00007B43  COSD.3             00007B44  COSD.4             00007B45  COSD.5             
+00007B46  COSD.6             00007B47  COSD.7             00007B48  COSD.8             
+00007B49  COSD.9             00007B20  COTD.0             00007B21  COTD.1             
+00007B2A  COTD.10            00007B2B  COTD.11            00007B2C  COTD.12            
+00007B2D  COTD.13            00007B2E  COTD.14            00007B2F  COTD.15            
+00007B22  COTD.2             00007B23  COTD.3             00007B24  COTD.4             
+00007B25  COTD.5             00007B26  COTD.6             00007B27  COTD.7             
+00007B28  COTD.8             00007B29  COTD.9             00007980  CTOIA.0            
+00007981  CTOIA.1            0000798A  CTOIA.10           0000798B  CTOIA.11           
+0000798C  CTOIA.12           0000798D  CTOIA.13           0000798E  CTOIA.14           
+0000798F  CTOIA.15           00007982  CTOIA.2            00007983  CTOIA.3            
+00007984  CTOIA.4            00007985  CTOIA.5            00007986  CTOIA.6            
+00007987  CTOIA.7            00007988  CTOIA.8            00007989  CTOIA.9            
+00007970  CTOIE.0            00007971  CTOIE.1            0000797A  CTOIE.10           
+0000797B  CTOIE.11           0000797C  CTOIE.12           0000797D  CTOIE.13           
+0000797E  CTOIE.14           0000797F  CTOIE.15           00007972  CTOIE.2            
+00007973  CTOIE.3            00007974  CTOIE.4            00007975  CTOIE.5            
+00007976  CTOIE.6            00007977  CTOIE.7            00007978  CTOIE.8            
+00007979  CTOIE.9            000079B0  CTOIN.0            000079B1  CTOIN.1            
+000079BA  CTOIN.10           000079BB  CTOIN.11           000079BC  CTOIN.12           
+000079BD  CTOIN.13           000079BE  CTOIN.14           000079BF  CTOIN.15           
+000079B2  CTOIN.2            000079B3  CTOIN.3            000079B4  CTOIN.4            
+000079B5  CTOIN.5            000079B6  CTOIN.6            000079B7  CTOIN.7            
+000079B8  CTOIN.8            000079B9  CTOIN.9            000079A0  CTOIP.0            
+000079A1  CTOIP.1            000079AA  CTOIP.10           000079AB  CTOIP.11           
+000079AC  CTOIP.12           000079AD  CTOIP.13           000079AE  CTOIP.14           
+000079AF  CTOIP.15           000079A2  CTOIP.2            000079A3  CTOIP.3            
+000079A4  CTOIP.4            000079A5  CTOIP.5            000079A6  CTOIP.6            
+000079A7  CTOIP.7            000079A8  CTOIP.8            000079A9  CTOIP.9            
+000079D0  CTOIXA.0           000079D1  CTOIXA.1           000079DA  CTOIXA.10          
+000079DB  CTOIXA.11          000079DC  CTOIXA.12          000079DD  CTOIXA.13          
+000079DE  CTOIXA.14          000079DF  CTOIXA.15          000079D2  CTOIXA.2           
+000079D3  CTOIXA.3           000079D4  CTOIXA.4           000079D5  CTOIXA.5           
+000079D6  CTOIXA.6           000079D7  CTOIXA.7           000079D8  CTOIXA.8           
+000079D9  CTOIXA.9           000079C0  CTOIXE.0           000079C1  CTOIXE.1           
+000079CA  CTOIXE.10          000079CB  CTOIXE.11          000079CC  CTOIXE.12          
+000079CD  CTOIXE.13          000079CE  CTOIXE.14          000079CF  CTOIXE.15          
+000079C2  CTOIXE.2           000079C3  CTOIXE.3           000079C4  CTOIXE.4           
+000079C5  CTOIXE.5           000079C6  CTOIXE.6           000079C7  CTOIXE.7           
+000079C8  CTOIXE.8           000079C9  CTOIXE.9           00007A00  CTOIXN.0           
+00007A01  CTOIXN.1           00007A0A  CTOIXN.10          00007A0B  CTOIXN.11          
+00007A0C  CTOIXN.12          00007A0D  CTOIXN.13          00007A0E  CTOIXN.14          
+00007A0F  CTOIXN.15          00007A02  CTOIXN.2           00007A03  CTOIXN.3           
+00007A04  CTOIXN.4           00007A05  CTOIXN.5           00007A06  CTOIXN.6           
+00007A07  CTOIXN.7           00007A08  CTOIXN.8           00007A09  CTOIXN.9           
+000079F0  CTOIXP.0           000079F1  CTOIXP.1           000079FA  CTOIXP.10          
+000079FB  CTOIXP.11          000079FC  CTOIXP.12          000079FD  CTOIXP.13          
+000079FE  CTOIXP.14          000079FF  CTOIXP.15          000079F2  CTOIXP.2           
+000079F3  CTOIXP.3           000079F4  CTOIXP.4           000079F5  CTOIXP.5           
+000079F6  CTOIXP.6           000079F7  CTOIXP.7           000079F8  CTOIXP.8           
+000079F9  CTOIXP.9           000079E0  CTOIXZ.0           000079E1  CTOIXZ.1           
+000079EA  CTOIXZ.10          000079EB  CTOIXZ.11          000079EC  CTOIXZ.12          
+000079ED  CTOIXZ.13          000079EE  CTOIXZ.14          000079EF  CTOIXZ.15          
+000079E2  CTOIXZ.2           000079E3  CTOIXZ.3           000079E4  CTOIXZ.4           
+000079E5  CTOIXZ.5           000079E6  CTOIXZ.6           000079E7  CTOIXZ.7           
+000079E8  CTOIXZ.8           000079E9  CTOIXZ.9           00007990  CTOIZ.0            
+00007991  CTOIZ.1            0000799A  CTOIZ.10           0000799B  CTOIZ.11           
+0000799C  CTOIZ.12           0000799D  CTOIZ.13           0000799E  CTOIZ.14           
+0000799F  CTOIZ.15           00007992  CTOIZ.2            00007993  CTOIZ.3            
+00007994  CTOIZ.4            00007995  CTOIZ.5            00007996  CTOIZ.6            
+00007997  CTOIZ.7            00007998  CTOIZ.8            00007999  CTOIZ.9            
+00007CD9  DEFLT              00000037  DEF_ONLY           000C0000  DENDBUFF           
+00007E70  DIV.0              00007E71  DIV.1              00007E7A  DIV.10             
+00007E7B  DIV.11             00007E7C  DIV.12             00007E7D  DIV.13             
+00007E7E  DIV.14             00007E7F  DIV.15             00007E72  DIV.2              
+00007E73  DIV.3              00007E74  DIV.4              00007E75  DIV.5              
+00007E76  DIV.6              00007E77  DIV.7              00007E78  DIV.8              
+00007E79  DIV.9              00000016  DIVBY0FLAG         00000011  DIVBY0SIGNAL       
+00000002  DIVBYZERO          00007FE3  DIVX0_VECT         00000002  DONE               
+00000010  DONEBIT            00007CDA  DSALTIMHAND        00007CDB  ENALTIMHAND        
+00007E10  ENDI.0             00007E11  ENDI.1             00007E1A  ENDI.10            
+00007E1B  ENDI.11            00007E1C  ENDI.12            00007E1D  ENDI.13            
+00007E1E  ENDI.14            00007E1F  ENDI.15            00007E12  ENDI.2             
+00007E13  ENDI.3             00007E14  ENDI.4             00007E15  ENDI.5             
+00007E16  ENDI.6             00007E17  ENDI.7             00007E18  ENDI.8             
+00007E19  ENDI.9             00100000  ERRBUFF            00000009  EXCSOURCE          
+00000006  EXP                00007B00  EXP.0              00007B01  EXP.1              
+00007B0A  EXP.10             00007B0B  EXP.11             00007B0C  EXP.12             
+00007B0D  EXP.13             00007B0E  EXP.14             00007B0F  EXP.15             
+00007B02  EXP.2              00007B03  EXP.3              00007B04  EXP.4              
+00007B05  EXP.5              00007B06  EXP.6              00007B07  EXP.7              
+00007B08  EXP.8              00007B09  EXP.9              00102000  EXPTIMEBUFF        
+00007800  FADD.0             00007801  FADD.1             0000780A  FADD.10            
+0000780B  FADD.11            0000780C  FADD.12            0000780D  FADD.13            
+0000780E  FADD.14            0000780F  FADD.15            00007802  FADD.2             
+00007803  FADD.3             00007804  FADD.4             00007805  FADD.5             
+00007806  FADD.6             00007807  FADD.7             00007808  FADD.8             
+00007809  FADD.9             00007850  FDIV.0             00007851  FDIV.1             
+0000785A  FDIV.10            0000785B  FDIV.11            0000785C  FDIV.12            
+0000785D  FDIV.13            0000785E  FDIV.14            0000785F  FDIV.15            
+00007852  FDIV.2             00007853  FDIV.3             00007854  FDIV.4             
+00007855  FDIV.5             00007856  FDIV.6             00007857  FDIV.7             
+00007858  FDIV.8             00007859  FDIV.9             00007830  FMA.0              
+00007831  FMA.1              0000783A  FMA.10             0000783B  FMA.11             
+0000783C  FMA.12             0000783D  FMA.13             0000783E  FMA.14             
+0000783F  FMA.15             00007832  FMA.2              00007833  FMA.3              
+00007834  FMA.4              00007835  FMA.5              00007836  FMA.6              
+00007837  FMA.7              00007838  FMA.8              00007839  FMA.9              
+00007820  FMUL.0             00007821  FMUL.1             0000782A  FMUL.10            
+0000782B  FMUL.11            0000782C  FMUL.12            0000782D  FMUL.13            
+0000782E  FMUL.14            0000782F  FMUL.15            00007822  FMUL.2             
+00007823  FMUL.3             00007824  FMUL.4             00007825  FMUL.5             
+00007826  FMUL.6             00007827  FMUL.7             00007828  FMUL.8             
+00007829  FMUL.9             00007810  FSUB.0             00007811  FSUB.1             
+0000781A  FSUB.10            0000781B  FSUB.11            0000781C  FSUB.12            
+0000781D  FSUB.13            0000781E  FSUB.14            0000781F  FSUB.15            
+00007812  FSUB.2             00007813  FSUB.3             00007814  FSUB.4             
+00007815  FSUB.5             00007816  FSUB.6             00007817  FSUB.7             
+00007818  FSUB.8             00007819  FSUB.9             0000000A  GAUSSIAN           
+0000000C  HARDMAX            00000004  HARDTAN            00000000  IDENT              
+00000010  INEXACT            00007FE0  INEXT_VECT         00000004  INITIALIZE         
+00000020  INTENABLE          00000001  INVALID            00000015  INVFLAG            
+00000010  INVSIGNAL          00007FE4  INV_VECT           0000000A  IRQ                
+00000005  IRQEN              00007FE5  IRQ_VECT           00000000  IS1985             
+00007FD0  IS2008             00007CD8  ISCANONICAL        00007CD2  ISFINITE           
+00007CD5  ISINFINITE         00007CD6  ISNAN              00007CD1  ISNORMAL           
+00007CD7  ISSIGNALING        00007CD0  ISSIGNMINUS        00007CD4  ISSUBNORMAL        
+00000031  ISTRUE             00007CD3  ISZERO             00007B10  LOG.0              
+00007B11  LOG.1              00007B1A  LOG.10             00007B1B  LOG.11             
+00007B1C  LOG.12             00007B1D  LOG.13             00007B1E  LOG.14             
+00007B1F  LOG.15             00007B12  LOG.2              00007B13  LOG.3              
+00007B14  LOG.4              00007B15  LOG.5              00007B16  LOG.6              
+00007B17  LOG.7              00007B18  LOG.8              00007B19  LOG.9              
+00007940  LOGB.0             00007941  LOGB.1             0000794A  LOGB.10            
+0000794B  LOGB.11            0000794C  LOGB.12            0000794D  LOGB.13            
+0000794E  LOGB.14            0000794F  LOGB.15            00007942  LOGB.2             
+00007943  LOGB.3             00007944  LOGB.4             00007945  LOGB.5             
+00007946  LOGB.6             00007947  LOGB.7             00007948  LOGB.8             
+00007949  LOGB.9             00000008  LOGISTIC           00007CE0  LOWERSIGS          
+00007CE6  LOWFLG             00007CE4  LOWNOFLAG          00007CE4  LOWNOFLAGS         
+00007CE0  LOWSIG             00007FED  LPCNT0             00007FEE  LPCNT1             
+00000003  LRELU              00007E50  MAX.0              00007E51  MAX.1              
+00007E5A  MAX.10             00007E5B  MAX.11             00007E5C  MAX.12             
+00007E5D  MAX.13             00007E5E  MAX.14             00007E5F  MAX.15             
+00007E52  MAX.2              00007E53  MAX.3              00007E54  MAX.4              
+00007E55  MAX.5              00007E56  MAX.6              00007E57  MAX.7              
+00007E58  MAX.8              00007E59  MAX.9              000078F0  MAXNUM.0           
+000078F1  MAXNUM.1           000078FA  MAXNUM.10          000078FB  MAXNUM.11          
+000078FC  MAXNUM.12          000078FD  MAXNUM.13          000078FE  MAXNUM.14          
+000078FF  MAXNUM.15          000078F2  MAXNUM.2           000078F3  MAXNUM.3           
+000078F4  MAXNUM.4           000078F5  MAXNUM.5           000078F6  MAXNUM.6           
+000078F7  MAXNUM.7           000078F8  MAXNUM.8           000078F9  MAXNUM.9           
+00007910  MAXNUMMG.0         00007911  MAXNUMMG.1         0000791A  MAXNUMMG.10        
+0000791B  MAXNUMMG.11        0000791C  MAXNUMMG.12        0000791D  MAXNUMMG.13        
+0000791E  MAXNUMMG.14        0000791F  MAXNUMMG.15        00007912  MAXNUMMG.2         
+00007913  MAXNUMMG.3         00007914  MAXNUMMG.4         00007915  MAXNUMMG.5         
+00007916  MAXNUMMG.6         00007917  MAXNUMMG.7         00007918  MAXNUMMG.8         
+00007919  MAXNUMMG.9         00007E40  MIN.0              00007E41  MIN.1              
+00007E4A  MIN.10             00007E4B  MIN.11             00007E4C  MIN.12             
+00007E4D  MIN.13             00007E4E  MIN.14             00007E4F  MIN.15             
+00007E42  MIN.2              00007E43  MIN.3              00007E44  MIN.4              
+00007E45  MIN.5              00007E46  MIN.6              00007E47  MIN.7              
+00007E48  MIN.8              00007E49  MIN.9              000078E0  MINNUM.0           
+000078E1  MINNUM.1           000078EA  MINNUM.10          000078EB  MINNUM.11          
+000078EC  MINNUM.12          000078ED  MINNUM.13          000078EE  MINNUM.14          
+000078EF  MINNUM.15          000078E2  MINNUM.2           000078E3  MINNUM.3           
+000078E4  MINNUM.4           000078E5  MINNUM.5           000078E6  MINNUM.6           
+000078E7  MINNUM.7           000078E8  MINNUM.8           000078E9  MINNUM.9           
+00007900  MINNUMMG.0         00007901  MINNUMMG.1         0000790A  MINNUMMG.10        
+0000790B  MINNUMMG.11        0000790C  MINNUMMG.12        0000790D  MINNUMMG.13        
+0000790E  MINNUMMG.14        0000790F  MINNUMMG.15        00007902  MINNUMMG.2         
+00007903  MINNUMMG.3         00007904  MINNUMMG.4         00007905  MINNUMMG.5         
+00007906  MINNUMMG.6         00007907  MINNUMMG.7         00007908  MINNUMMG.8         
+00007909  MINNUMMG.9         00007FEB  MONITR_REG         00007E80  MUL.0              
+00007E81  MUL.1              00007E8A  MUL.10             00007E8B  MUL.11             
+00007E8C  MUL.12             00007E8D  MUL.13             00007E8E  MUL.14             
+00007E8F  MUL.15             00007E82  MUL.2              00007E83  MUL.3              
+00007E84  MUL.4              00007E85  MUL.5              00007E86  MUL.6              
+00007E87  MUL.7              00007E88  MUL.8              00007E89  MUL.9              
+00000002  N                  00000004  NBIT               000078C0  NEGATE.0           
+000078C1  NEGATE.1           000078CA  NEGATE.10          000078CB  NEGATE.11          
+000078CC  NEGATE.12          000078CD  NEGATE.13          000078CE  NEGATE.14          
+000078CF  NEGATE.15          000078C2  NEGATE.2           000078C3  NEGATE.3           
+000078C4  NEGATE.4           000078C5  NEGATE.5           000078C6  NEGATE.6           
+000078C7  NEGATE.7           000078C8  NEGATE.8           000078C9  NEGATE.9           
+00000026  NEGATIVEINFINITY   00000027  NEGATIVENORMAL     00000028  NEGATIVESUBNORMAL  
+00000029  NEGATIVEZERO       00007920  NEXTDWN.0          00007921  NEXTDWN.1          
+0000792A  NEXTDWN.10         0000792B  NEXTDWN.11         0000792C  NEXTDWN.12         
+0000792D  NEXTDWN.13         0000792E  NEXTDWN.14         0000792F  NEXTDWN.15         
+00007922  NEXTDWN.2          00007923  NEXTDWN.3          00007924  NEXTDWN.4          
+00007925  NEXTDWN.5          00007926  NEXTDWN.6          00007927  NEXTDWN.7          
+00007928  NEXTDWN.8          00007929  NEXTDWN.9          00007930  NEXTUP.0           
+00007931  NEXTUP.1           0000793A  NEXTUP.10          0000793B  NEXTUP.11          
+0000793C  NEXTUP.12          0000793D  NEXTUP.13          0000793E  NEXTUP.14          
+0000793F  NEXTUP.15          00007932  NEXTUP.2           00007933  NEXTUP.3           
+00007934  NEXTUP.4           00007935  NEXTUP.5           00007936  NEXTUP.6           
+00007937  NEXTUP.7           00007938  NEXTUP.8           00007939  NEXTUP.9           
+00007FE6  NMI_VECT           00000019  NXACTFLAG          00000014  NXACTSIGNAL        
+00007EE0  OR.0               00007EE1  OR.1               00007EEA  OR.10              
+00007EEB  OR.11              00007EEC  OR.12              00007EED  OR.13              
+00007EEE  OR.14              00007EEF  OR.15              00007EE2  OR.2               
+00007EE3  OR.3               00007EE4  OR.4               00007EE5  OR.5               
+00007EE6  OR.6               00007EE7  OR.7               00007EE8  OR.8               
+00007EE9  OR.9               00000004  OVERFLOW           00000017  OVFLFLAG           
+00000012  OVFLSIGNAL         00007FE2  OVFL_VECT          00007FF5  PC                 
+00007FF3  PCC                00007FF4  PCS                00007FF2  PC_COPY            
+00007FF6  PC_REL             0000002D  POSITIVEINFINITY   0000002C  POSITIVENORMAL     
+0000002B  POSITIVESUBNORMAL  0000002A  POSITIVEZERO       00007AE0  POW.0              
+00007AE1  POW.1              00007AEA  POW.10             00007AEB  POW.11             
+00007AEC  POW.12             00007AED  POW.13             00007AEE  POW.14             
+00007AEF  POW.15             00007AF0  POW.16             00007AF1  POW.17             
+00007AF2  POW.18             00007AF3  POW.19             00007AE2  POW.2              
+00007AF4  POW.20             00007AF5  POW.21             00007AF6  POW.22             
+00007AF7  POW.23             00007AF8  POW.24             00007AF9  POW.25             
+00007AFA  POW.26             00007AFB  POW.27             00007AFC  POW.28             
+00007AFD  POW.29             00007AE3  POW.3              00007AFE  POW.30             
+00007AFF  POW.31             00007AE4  POW.4              00007AE5  POW.5              
+00007AE6  POW.6              00007AE7  POW.7              00007AE8  POW.8              
+00007AE9  POW.9              00007FF0  PRNG               00000013  PROGEND            
+00000000  PROG_ENTRY         00000001  PROG_LEN           00007FB0  PSHXCU.0           
+00007FB1  PSHXCU.1           00007FBA  PSHXCU.10          00007FBB  PSHXCU.11          
+00007FBC  PSHXCU.12          00007FBD  PSHXCU.13          00007FBE  PSHXCU.14          
+00007FBF  PSHXCU.15          00007FB2  PSHXCU.2           00007FB3  PSHXCU.3           
+00007FB4  PSHXCU.4           00007FB5  PSHXCU.5           00007FB6  PSHXCU.6           
+00007FB7  PSHXCU.7           00007FB8  PSHXCU.8           00007FB9  PSHXCU.9           
+00007FA0  PULXCU.0           00007FA1  PULXCU.1           00007FAA  PULXCU.10          
+00007FAB  PULXCU.11          00007FAC  PULXCU.12          00007FAD  PULXCU.13          
+00007FAE  PULXCU.14          00007FAF  PULXCU.15          00007FA2  PULXCU.2           
+00007FA3  PULXCU.3           00007FA4  PULXCU.4           00007FA5  PULXCU.5           
+00007FA6  PULXCU.6           00007FA7  PULXCU.7           00007FA8  PULXCU.8           
+00007FA9  PULXCU.9           0000000B  PUSHSPIKES         00000025  QUIETNAN           
+00007FD5  RADIX              00080000  RATESMEM           00007CE7  RAZFLG             
+00007CE5  RAZNOFLAG          00007CE5  RAZNOFLAGS         00007CE1  RAZSIG             
+00007CE1  RAZSIGS            00000002  RELU               00007880  REM.0              
+00007881  REM.1              0000788A  REM.10             0000788B  REM.11             
+0000788C  REM.12             0000788D  REM.13             0000788E  REM.14             
+0000788F  REM.15             00007890  REM.16             00007891  REM.17             
+00007892  REM.18             00007893  REM.19             00007882  REM.2              
+00007894  REM.20             00007895  REM.21             00007896  REM.22             
+00007897  REM.23             00007898  REM.24             00007899  REM.25             
+0000789A  REM.26             0000789B  REM.27             0000789C  REM.28             
+0000789D  REM.29             00007883  REM.3              0000789E  REM.30             
+0000789F  REM.31             00007884  REM.4              00007885  REM.5              
+00007886  REM.6              00007887  REM.7              00007888  REM.8              
+00007889  REM.9              00007FEF  REPEAT             00000033  RM0                
+00000034  RM1                00000035  RM_ATTRIB          0000001B  RNF_DIVBY0         
+0000001A  RNF_INV            0000001E  RNF_NXACT          0000001C  RNF_OVFL           
+0000001D  RNF_UNFL           00007CE2  RSTRFLG            00007A20  RTOIA.0            
+00007A21  RTOIA.1            00007A2A  RTOIA.10           00007A2B  RTOIA.11           
+00007A2C  RTOIA.12           00007A2D  RTOIA.13           00007A2E  RTOIA.14           
+00007A2F  RTOIA.15           00007A22  RTOIA.2            00007A23  RTOIA.3            
+00007A24  RTOIA.4            00007A25  RTOIA.5            00007A26  RTOIA.6            
+00007A27  RTOIA.7            00007A28  RTOIA.8            00007A29  RTOIA.9            
+00007A10  RTOIE.0            00007A11  RTOIE.1            00007A1A  RTOIE.10           
+00007A1B  RTOIE.11           00007A1C  RTOIE.12           00007A1D  RTOIE.13           
+00007A1E  RTOIE.14           00007A1F  RTOIE.15           00007A12  RTOIE.2            
+00007A13  RTOIE.3            00007A14  RTOIE.4            00007A15  RTOIE.5            
+00007A16  RTOIE.6            00007A17  RTOIE.7            00007A18  RTOIE.8            
+00007A19  RTOIE.9            00007A50  RTOIN.0            00007A51  RTOIN.1            
+00007A5A  RTOIN.10           00007A5B  RTOIN.11           00007A5C  RTOIN.12           
+00007A5D  RTOIN.13           00007A5E  RTOIN.14           00007A5F  RTOIN.15           
+00007A52  RTOIN.2            00007A53  RTOIN.3            00007A54  RTOIN.4            
+00007A55  RTOIN.5            00007A56  RTOIN.6            00007A57  RTOIN.7            
+00007A58  RTOIN.8            00007A59  RTOIN.9            00007A40  RTOIP.0            
+00007A41  RTOIP.1            00007A4A  RTOIP.10           00007A4B  RTOIP.11           
+00007A4C  RTOIP.12           00007A4D  RTOIP.13           00007A4E  RTOIP.14           
+00007A4F  RTOIP.15           00007A42  RTOIP.2            00007A43  RTOIP.3            
+00007A44  RTOIP.4            00007A45  RTOIP.5            00007A46  RTOIP.6            
+00007A47  RTOIP.7            00007A48  RTOIP.8            00007A49  RTOIP.9            
+00007A60  RTOIX.0            00007A61  RTOIX.1            00007A6A  RTOIX.10           
+00007A6B  RTOIX.11           00007A6C  RTOIX.12           00007A6D  RTOIX.13           
+00007A6E  RTOIX.14           00007A6F  RTOIX.15           00007A62  RTOIX.2            
+00007A63  RTOIX.3            00007A64  RTOIX.4            00007A65  RTOIX.5            
+00007A66  RTOIX.6            00007A67  RTOIX.7            00007A68  RTOIX.8            
+00007A69  RTOIX.9            00007A30  RTOIZ.0            00007A31  RTOIZ.1            
+00007A3A  RTOIZ.10           00007A3B  RTOIZ.11           00007A3C  RTOIZ.12           
+00007A3D  RTOIZ.13           00007A3E  RTOIZ.14           00007A3F  RTOIZ.15           
+00007A32  RTOIZ.2            00007A33  RTOIZ.3            00007A34  RTOIZ.4            
+00007A35  RTOIZ.5            00007A36  RTOIZ.6            00007A37  RTOIZ.7            
+00007A38  RTOIZ.8            00007A39  RTOIZ.9            00000008  S1                 
+0000000F  S128               0000000C  S16                00000009  S2                 
+0000000D  S32                0000000A  S4                 0000000E  S64                
+0000000B  S8                 00007FD9  SAVALLFLAGS        00007FD7  SAVEDMODES         
+00007950  SCALEB.0           00007951  SCALEB.1           0000795A  SCALEB.10          
+0000795B  SCALEB.11          0000795C  SCALEB.12          0000795D  SCALEB.13          
+0000795E  SCALEB.14          0000795F  SCALEB.15          00007952  SCALEB.2           
+00007953  SCALEB.3           00007954  SCALEB.4           00007955  SCALEB.5           
+00007956  SCALEB.6           00007957  SCALEB.7           00007958  SCALEB.8           
+00007959  SCALEB.9           00007FE9  SCHEDCMP           00007FEA  SCHEDULER          
+00007CDB  SETALTIMM          00007CDD  SETDVNCZ           00007CDF  SETSUBSTT          
+00007FD8  SGTBINRNDIR        00007E60  SHIFT.0            00007E61  SHIFT.1            
+00007E6A  SHIFT.10           00007E6B  SHIFT.11           00007E6C  SHIFT.12           
+00007E6D  SHIFT.13           00007E6E  SHIFT.14           00007E6F  SHIFT.15           
+00007E62  SHIFT.2            00007E63  SHIFT.3            00007E64  SHIFT.4            
+00007E65  SHIFT.5            00007E66  SHIFT.6            00007E67  SHIFT.7            
+00007E68  SHIFT.8            00007E69  SHIFT.9            00000024  SIGNALINGNAN       
+00007B50  SIND.0             00007B51  SIND.1             00007B5A  SIND.10            
+00007B5B  SIND.11            00007B5C  SIND.12            00007B5D  SIND.13            
+00007B5E  SIND.14            00007B5F  SIND.15            00007B52  SIND.2             
+00007B53  SIND.3             00007B54  SIND.4             00007B55  SIND.5             
+00007B56  SIND.6             00007B57  SIND.7             00007B58  SIND.8             
+00007B59  SIND.9             00101000  SLOPEBUFF          00004000  SNNINPUT           
+0000000B  SOFTMAX            00000009  SOFTPLUS           00000008  SOFTSTEP           
+00007FFE  SP                 0000000B  SPARE0             0000000C  SPARE1             
+0000000D  SPARE2             0000000E  SPARE3             0000000F  SPARE4             
+00007FE7  SPARE_VEC0         00007FE8  SPARE_VEC1         00008000  SPIKEOUTMEM        
+00002000  SPIKESRCMEM        00007FFF  SP_TOS             00000001  SQNL               
+00007860  SQRT.0             00007861  SQRT.1             0000786A  SQRT.10            
+0000786B  SQRT.11            0000786C  SQRT.12            0000786D  SQRT.13            
+0000786E  SQRT.14            0000786F  SQRT.15            00007870  SQRT.16            
+00007871  SQRT.17            00007872  SQRT.18            00007873  SQRT.19            
+00007862  SQRT.2             00007874  SQRT.20            00007875  SQRT.21            
+00007876  SQRT.22            00007877  SQRT.23            00007878  SQRT.24            
+00007879  SQRT.25            0000787A  SQRT.26            0000787B  SQRT.27            
+0000787C  SQRT.28            0000787D  SQRT.29            00007863  SQRT.3             
+0000787E  SQRT.30            0000787F  SQRT.31            00007864  SQRT.4             
+00007865  SQRT.5             00007866  SQRT.6             00007867  SQRT.7             
+00007868  SQRT.8             00007869  SQRT.9             00000005  SQ_RBF             
+00007FF1  STATUS             00007EA0  SUB.0              00007EA1  SUB.1              
+00007EAA  SUB.10             00007EAB  SUB.11             00007EAC  SUB.12             
+00007EAD  SUB.13             00007EAE  SUB.14             00007EAF  SUB.15             
+00007EA2  SUB.2              00007EA3  SUB.3              00007EA4  SUB.4              
+00007EA5  SUB.5              00007EA6  SUB.6              00007EA7  SUB.7              
+00007EA8  SUB.8              00007EA9  SUB.9              00007E90  SUBB.0             
+00007E91  SUBB.1             00007E9A  SUBB.10            00007E9B  SUBB.11            
+00007E9C  SUBB.12            00007E9D  SUBB.13            00007E9E  SUBB.14            
+00007E9F  SUBB.15            00007E92  SUBB.2             00007E93  SUBB.3             
+00007E94  SUBB.4             00007E95  SUBB.5             00007E96  SUBB.6             
+00007E97  SUBB.7             00007E98  SUBB.8             00007E99  SUBB.9             
+0000003F  SUBS_ABRUPTUNDRFL  00000039  SUBS_DIVBY0        00000038  SUBS_INV           
+00000032  SUBS_NXACT         0000003A  SUBS_OVFL          0000003B  SUBS_UNFL          
+0000003E  SUBS_X             0000003D  SUBS_XOR_X         00007B30  TAND.0             
+00007B31  TAND.1             00007B3A  TAND.10            00007B3B  TAND.11            
+00007B3C  TAND.12            00007B3D  TAND.13            00007B3E  TAND.14            
+00007B3F  TAND.15            00007B32  TAND.2             00007B33  TAND.3             
+00007B34  TAND.4             00007B35  TAND.5             00007B36  TAND.6             
+00007B37  TAND.7             00007B38  TAND.8             00007B39  TAND.9             
+00000007  TANH               00018000  THRESHMEM          00007FEC  TIMER              
+00007CE9  TORD               00007CE8  TORDM              0000002E  TOTLORDER          
+0000002F  TOTLORDERMAG       00007CE3  TSTFLG             00007FCE  TSTSAVFLG          
+00007B80  UC.0               00007B81  UC.1               00007B8A  UC.10              
+00007B8B  UC.11              00007B8C  UC.12              00007B8D  UC.13              
+00007B8E  UC.14              00007B8F  UC.15              00007B90  UC.16              
+00007B91  UC.17              00007B92  UC.18              00007B93  UC.19              
+00007B82  UC.2               00007B94  UC.20              00007B95  UC.21              
+00007B96  UC.22              00007B97  UC.23              00007B98  UC.24              
+00007B99  UC.25              00007B9A  UC.26              00007B9B  UC.27              
+00007B9C  UC.28              00007B9D  UC.29              00007B83  UC.3               
+00007B9E  UC.30              00007B9F  UC.31              00007B84  UC.4               
+00007B85  UC.5               00007B86  UC.6               00007B87  UC.7               
+00007B88  UC.8               00007B89  UC.9               00007B60  UFMA.0             
+00007B61  UFMA.1             00007B6A  UFMA.10            00007B6B  UFMA.11            
+00007B6C  UFMA.12            00007B6D  UFMA.13            00007B6E  UFMA.14            
+00007B6F  UFMA.15            00007B70  UFMA.16            00007B71  UFMA.17            
+00007B72  UFMA.18            00007B73  UFMA.19            00007B62  UFMA.2             
+00007B74  UFMA.20            00007B75  UFMA.21            00007B76  UFMA.22            
+00007B77  UFMA.23            00007B78  UFMA.24            00007B79  UFMA.25            
+00007B7A  UFMA.26            00007B7B  UFMA.27            00007B7C  UFMA.28            
+00007B7D  UFMA.29            00007B63  UFMA.3             00007B7E  UFMA.30            
+00007B7F  UFMA.31            00007B64  UFMA.4             00007B65  UFMA.5             
+00007B66  UFMA.6             00007B67  UFMA.7             00007B68  UFMA.8             
+00007B69  UFMA.9             00000008  UNDERFLOW          00000018  UNFLFLAG           
+00000013  UNFLSIGNAL         00007FE1  UNFL_VECT          00000003  V                  
+00000008  VBIT               00000000  XCU.0              00000001  XCU.1              
+0000000A  XCU.10             0000000B  XCU.11             0000000C  XCU.12             
+0000000D  XCU.13             0000000E  XCU.14             0000000F  XCU.15             
+00000002  XCU.2              00000003  XCU.3              00000004  XCU.4              
+00000005  XCU.5              00000006  XCU.6              00000007  XCU.7              
+00000008  XCU.8              00000009  XCU.9              00000001  XCU0               
+00000002  XCU1               00000400  XCU10              00000800  XCU11              
+00001000  XCU12              00002000  XCU13              00004000  XCU14              
+00008000  XCU15              00000004  XCU2               00000008  XCU3               
+00000010  XCU4               00000020  XCU5               00000040  XCU6               
+00000080  XCU7               00000100  XCU8               00000200  XCU9               
+00007FC0  XCUPUSHALL         00007FDF  XCU_C_R            00007FD2  XCU_FORCE_BREAK    
+00007FD1  XCU_FORCE_RESET    00007FC0  XCU_MON_POKE_ALL   00007FB0  XCU_MON_REQUEST.0  
+00007FB1  XCU_MON_REQUEST.1  00007FB2  XCU_MON_REQUEST.2  00007FB3  XCU_MON_REQUEST.3  
+00007FB4  XCU_MON_REQUEST.4  00007FB5  XCU_MON_REQUEST.5  00007FB6  XCU_MON_REQUEST.6  
+00007FB7  XCU_MON_REQUEST.7  00007FB8  XCU_MON_REQUEST.8  00007FB9  XCU_MON_REQUEST.9  
+00007FBA  XCU_MON_REQUEST.A  00007FBB  XCU_MON_REQUEST.B  00007FBC  XCU_MON_REQUEST.C  
+00007FBD  XCU_MON_REQUEST.D  00007FBE  XCU_MON_REQUEST.E  00007FBF  XCU_MON_REQUEST.F  
+00007FD4  XCU_PREEMPT        00007FD3  XCU_SSTEP          00007FDE  XCU_S_R            
+00007ED0  XOR.0              00007ED1  XOR.1              00007EDA  XOR.10             
+00007EDB  XOR.11             00007EDC  XOR.12             00007EDD  XOR.13             
+00007EDE  XOR.14             00007EDF  XOR.15             00007ED2  XOR.2              
+00007ED3  XOR.3              00007ED4  XOR.4              00007ED5  XOR.5              
+00007ED6  XOR.6              00007ED7  XOR.7              00007ED8  XOR.8              
+00007ED9  XOR.9              00000000  Z                  00000001  ZBIT               
+00000000  _1                 00003F40  _1.25              00000007  _128               
+00000004  _16                00000001  _2                 00004040  _2.5               
+00004080  _3.0               000040C0  _3.5               000040E0  _3.75              
+00000005  _32                00000002  _4                 00004100  _4.0               
+00000006  _64                00000003  _8                 
+
