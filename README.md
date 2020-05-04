@@ -26,7 +26,7 @@ Next, the demonstration simulation, which simply pushes a series of spikes into 
 Once you've done that, click on the “Run Simulation” button again to launch the simulation.
 
 When the simulation is complete, you should be able to find seven new .txt files in the same working directory as a result of the simulation.  These are:
-1) dendrite.txt, which contains decimal character floating-point representations of the contents of the HedgeHog dendrite trance buffer;
+1) dendrite.txt, which contains decimal character floating-point representations of the contents of the HedgeHog dendrite trace buffer;
 2) output levels.txt, which contains decimal character floating-point representations of the contents of the eight membranes' output level trace buffer;
 3) slopeAmounts.txt, which contains decimal character floating-point representations of the contents of the slopes trace buffer;
 4) errAmounts.txt, which contains the contents of the distance/error computations trace buffer;
