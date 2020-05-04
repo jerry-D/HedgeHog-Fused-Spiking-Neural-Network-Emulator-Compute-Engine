@@ -1,5 +1,6 @@
 ![](https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/HedgeHog_Logo.png )
 ## HedgeHog Fused Spiking Neural Network Emulator/Compute Engine for RISC-V
+(May 4, 2020) The Google Sheets plots are now open.
 (May 3, 2020)   Created specifically for incorporation into a simplified mover “shell” version of the SYMPL 64-bit Universal Floating-Point Compute Engine, this memory-mapped Fused Spiking Neural Network (FSNN) is designed for ready implementation within the programmable fabric of Xilinx® Kintex® UltraTM Plus brand FPGAs. This implementation, including the SYMPL mover “shell” that houses it and makes it go, consumes only 33% of the LUTs in Xilinx's smallest Kintex Ultra Plus device and will clock at over 100MHz in the -3 speed grade.
 
 ![](https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/RISC_V_HedgeHog_Blk.png )
