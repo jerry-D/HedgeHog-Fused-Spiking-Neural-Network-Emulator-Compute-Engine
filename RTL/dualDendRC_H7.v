@@ -1,7 +1,7 @@
 //dualDendRC_H7.v
 //
 // Author:  Jerry D. Harthcock
-// Version:  1.22  May 3, 2020
+// Version:  1.23  June 28, 2020
 // Copyright (C) 2020.  All rights reserved.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +64,9 @@ module dualDendRC_H7 (
     weightA,
     weightB,
     levelOutA,
-    levelOutB
+    levelOutB,
+    killDend_A,
+    killDend_B
     );
 input CLK;
 input RESET;
@@ -78,6 +80,8 @@ input [15:0] weightA;
 input [15:0] weightB;
 output [15:0] levelOutA;
 output [15:0] levelOutB;
+output killDend_A;
+output killDend_B;
 
 parameter idle = 2'b00;
 parameter charge = 2'b01;
@@ -111,6 +115,12 @@ wire [15:0] percentB;
 
 wire [8:0] rdaddrsA;
 wire [8:0] rdaddrsB;
+
+wire killDend_A;
+wire killDend_B;
+
+assign killDend_A = resetA || (stateA==idle);
+assign killDend_B = resetB || (stateB==idle);
 
 assign percentA = (stateA==idle || stateA_q1==charge || stateA_q1==idle) ? TauA[31:16] : TauA[15:0];
 assign percentB = (stateB==idle || stateB_q1==charge || stateB_q1==idle) ? TauB[31:16] : TauB[15:0];

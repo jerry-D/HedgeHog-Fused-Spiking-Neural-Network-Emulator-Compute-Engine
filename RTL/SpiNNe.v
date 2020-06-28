@@ -1,7 +1,7 @@
 //SpiNNe.v
 //
 // Author:  Jerry D. Harthcock
-// Version:  1.22  May 3, 2020
+// Version:  1.23  June 28, 2020
 // Copyright (C) 2020.  All rights reserved.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,8 +223,12 @@ wire [15:0] prevSum5;
 wire [15:0] prevSum6;
 wire [15:0] prevSum7;
 
-assign sumRden = (pushSpikesIn_q4 && accum_q4) || (rdenA && (rdaddrsA[31:15]==17'b0000_0000_0000_0001_0));
-assign sumRdaddrs = pushSpikesIn_q4 ? {wraddrs_q4[11:0], 3'b000} : rdaddrsA[14:0];
+//assign sumRden = (pushSpikesIn_q4 && accum_q4) || (rdenA && (rdaddrsA[31:15]==17'b0000_0000_0000_0001_0));
+//assign sumRdaddrs = pushSpikesIn_q4 ? {wraddrs_q4[11:0], 3'b000} : rdaddrsA[14:0];
+
+assign sumRden = (pushSpikesIn_q3 && accum_q3) || (rdenA && (rdaddrsA[31:15]==17'b0000_0000_0000_0001_0));
+assign sumRdaddrs = pushSpikesIn_q3 ? {wraddrs_q3[11:0], 3'b000} : rdaddrsA[14:0];
+
 
 assign prevSum0 = sums[15:0   ];
 assign prevSum1 = sums[31:16  ];

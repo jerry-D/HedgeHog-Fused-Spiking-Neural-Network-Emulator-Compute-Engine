@@ -1,7 +1,7 @@
 //spikeNeuron8_H7.v
 //
 // Author:  Jerry D. Harthcock
-// Version:  1.22  May 3, 2020
+// Version:  1.23  June 28, 2020
 // Copyright (C) 2020.  All rights reserved.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +141,6 @@ output  spikeOut;
 output [15:0] err;
 output [15:0] slope;
 
-
 wire [15:0] slope;
 
 wire [15:0] R01;
@@ -160,6 +159,15 @@ wire spikeOut;
 
 wire [15:0] threshGateAdj;
 
+wire killDend_A0;
+wire killDend_B0;
+wire killDend_A1;
+wire killDend_B1;
+wire killDend_A2;
+wire killDend_B2;
+wire killDend_A3;
+wire killDend_B3;
+
 assign spikeOut = activate ? (levelOutMembr > threshold) : 1'b0;
 assign accumSum = accumulate ? prevSum : 16'h0000;
 
@@ -175,7 +183,9 @@ dualDendRC_H7 dualDend_0(
     .weightA       (weight0      ),
     .weightB       (weight1      ),
     .levelOutA     (levelOut0    ),
-    .levelOutB     (levelOut1    )
+    .levelOutB     (levelOut1    ),
+    .killDend_A    (killDend_A0  ),
+    .killDend_B    (killDend_B0  )
     );                           
 
 dualDendRC_H7 dualDend_1(
@@ -190,7 +200,9 @@ dualDendRC_H7 dualDend_1(
     .weightA       (weight2      ),
     .weightB       (weight3      ),
     .levelOutA     (levelOut2    ),
-    .levelOutB     (levelOut3    )
+    .levelOutB     (levelOut3    ),
+    .killDend_A    (killDend_A1  ),
+    .killDend_B    (killDend_B1  )
     );                           
 
 dualDendRC_H7 dualDend_2(
@@ -205,7 +217,9 @@ dualDendRC_H7 dualDend_2(
     .weightA       (weight4      ),
     .weightB       (weight5      ),
     .levelOutA     (levelOut4    ),
-    .levelOutB     (levelOut5    )
+    .levelOutB     (levelOut5    ),
+    .killDend_A    (killDend_A2  ),
+    .killDend_B    (killDend_B2  )
     );                           
 
 dualDendRC_H7 dualDend_3(
@@ -220,14 +234,17 @@ dualDendRC_H7 dualDend_3(
     .weightA       (weight6      ),
     .weightB       (weight7      ),
     .levelOutA     (levelOut6    ),
-    .levelOutB     (levelOut7    )
-    );                           
+    .levelOutB     (levelOut7    ),
+    .killDend_A    (killDend_A3  ),
+    .killDend_B    (killDend_B3  )
+    );                            
+
 
 FADD711 fadd_01(
     .CLK   (CLK      ),
-    .A     (spikeOut ? 16'b0 : levelOut0),
+    .A     (killDend_A0 ? 16'b0 : levelOut0),
     .GRSinA(3'b0     ),
-    .B     (spikeOut ? 16'b0 : levelOut1),
+    .B     (killDend_B0 ? 16'b0 : levelOut1),
     .GRSinB(3'b0     ),
     .R     (R01      ),
     .GRSout(         ),
@@ -236,9 +253,9 @@ FADD711 fadd_01(
 
 FADD711 fadd_23(
     .CLK   (CLK      ),
-    .A     (spikeOut ? 16'b0 : levelOut2),
+    .A     (killDend_A1 ? 16'b0 : levelOut2),
     .GRSinA(3'b0     ),
-    .B     (spikeOut ? 16'b0 : levelOut3),
+    .B     (killDend_B1 ? 16'b0 : levelOut3),
     .GRSinB(3'b0     ),
     .R     (R23      ),
     .GRSout(         ),
@@ -247,9 +264,9 @@ FADD711 fadd_23(
 
 FADD711 fadd_45(
     .CLK   (CLK      ),
-    .A     (spikeOut ? 16'b0 : levelOut4),
+    .A     (killDend_A2 ? 16'b0 : levelOut4),
     .GRSinA(3'b0     ),
-    .B     (spikeOut ? 16'b0 : levelOut5),
+    .B     (killDend_B2 ? 16'b0 : levelOut5),
     .GRSinB(3'b0     ),
     .R     (R45      ),
     .GRSout(         ),
@@ -258,20 +275,30 @@ FADD711 fadd_45(
 
 FADD711 fadd_67(
     .CLK   (CLK      ),
-    .A     (spikeOut ? 16'b0 : levelOut6),
+    .A     (killDend_A3 ? 16'b0 : levelOut6),
     .GRSinA(3'b0     ),
-    .B     (spikeOut ? 16'b0 : levelOut7),
+    .B     (killDend_B3 ? 16'b0 : levelOut7),
     .GRSinB(3'b0     ),
     .R     (R67      ),
     .GRSout(         ),
     .except(         )
     );     
 
+wire killDend_A0B0;
+wire killDend_A1B1;
+wire killDend_A2B2;
+wire killDend_A3B3;
+assign killDend_A0B0 = killDend_A0 || killDend_B0;
+assign killDend_A1B1 = killDend_A1 || killDend_B1;
+assign killDend_A2B2 = killDend_A2 || killDend_B2;
+assign killDend_A3B3 = killDend_A3 || killDend_B3;
+
+
 FADD711 fadd_0123(
     .CLK   (CLK  ),
-    .A     (spikeOut ? 16'b0 : R01  ),
+    .A     (killDend_A0B0 ? 16'b0 : R01  ),
     .GRSinA(3'b0 ),
-    .B     (spikeOut ? 16'b0 : R23  ),
+    .B     (killDend_A1B1 ? 16'b0 : R23  ),
     .GRSinB(3'b0 ),
     .R     (R0123),
     .GRSout(     ),
@@ -280,31 +307,39 @@ FADD711 fadd_0123(
 
 FADD711 fadd_4567(
     .CLK   (CLK  ),
-    .A     (spikeOut ? 16'b0 : R45  ),
+    .A     (killDend_A2B2 ? 16'b0 : R45  ),
     .GRSinA(3'b0 ),
-    .B     (spikeOut ? 16'b0 : R67  ),
+    .B     (killDend_A3B3 ? 16'b0 : R67  ),
     .GRSinB(3'b0 ),
     .R     (R4567),
     .GRSout(     ),
     .except(     )
     );     
 
+wire killDend_A0B0A1B1;
+wire killDend_A2B2A3B3;
+assign killDend_A0B0A1B1 = killDend_A0B0 || killDend_A1B1;
+assign killDend_A2B2A3B3 = killDend_A2B2 || killDend_A3B3;
+
 FADD711 fadd_01234567(
     .CLK   (CLK  ),
-    .A     (spikeOut ? 16'b0 : R0123),
+    .A     (killDend_A0B0A1B1 ? 16'b0 : R0123),
     .GRSinA(3'b0 ),
-    .B     (spikeOut ? 16'b0 : R4567),
+    .B     (killDend_A2B2A3B3 ? 16'b0 : R4567),
     .GRSinB(3'b0 ),
     .R     (R01234567),
     .GRSout(     ),
     .except(     )
     );     
 
+wire killAll;
+assign killAll = killDend_A0B0A1B1 || killDend_A2B2A3B3;
+
 FADD711 fadd_R(
     .CLK   (CLK  ),
-    .A     (spikeOut ? 16'b0 : R01234567),
+    .A     (killAll ? 16'b0 : R01234567),
     .GRSinA(3'b0 ),
-    .B     (spikeOut ? 16'b0 : accumSum),
+    .B     (killAll ? 16'b0 : accumSum),
     .GRSinB(3'b0 ),
     .R     (levelOutMembr),
     .GRSout(     ),
