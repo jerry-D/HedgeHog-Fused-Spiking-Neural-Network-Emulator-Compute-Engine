@@ -1,7 +1,7 @@
 // SpiNNe_tb.v
 //
 // Author:  Jerry D. Harthcock
-// Version:  1.22  May 3, 2020
+// Version:  1.23  June 28, 2020
 // Copyright (C) 2020.  All rights reserved.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,7 +181,8 @@ initial begin
         WeightInBuf[k] = 0;
         k=k+1;
     end        
-        file = $fopen("weights.txt", "rb");   
+//        file = $fopen("weights.txt", "rb");       //use this for 8x8 or 16x16 single layer
+        file = $fopen("weights_32x32.txt", "rb");   //use this for 32x32 single layer
         r = $fread(WeightInBuf, file, 0);       
         $fclose(file); 
     k=0;
@@ -229,7 +230,9 @@ initial begin
         @(posedge clk);         
        
         // load the SCE program into into SCE during initialization
-        file = $fopen("spikeDemo.HEX", "rb");   
+//        file = $fopen("spikeDemo.HEX", "rb");            //use this for 8x8 single layer
+//        file = $fopen("spikeDemo16x16.HEX", "rb");       //use this for 16x16 single layer
+        file = $fopen("spikeDemo32x32.HEX", "rb");         //use this for 32x32 single layer
         r = $fread(ProgBuff64, file, 0);       
         $fclose(file); 
         @(posedge clk);
@@ -261,7 +264,7 @@ initial begin
 //retrieve resulting data, convert to decimal char sequences, then write to file(s) 
         k=0;
         //do dendrite buffer first
-        while(k<ticks*64) begin
+        while(k<ticks*64) begin      //use this for 8x8 single layer
             HOST_MONITOR_READ(3'b001, dendBuff+k, fromBinWrdata);
             fromBinWren = 1'b1; 
             fromBinWraddrs = k;
@@ -281,7 +284,7 @@ initial begin
         
         k=0;
         //replace token exponent with one a spreadsheet understands
-        while(k<ticks*64) begin
+        while(k<ticks*64) begin      //use this for 8x8 single layer
                
          BinDecFix[k] = (fromBin.RAMA[k][15:0]=="+0") ? {11{"0"}} : 
          (fromBin.RAMA[k][7:0]<":") ? {fromBin.RAMA[k], "e+00"} :
@@ -298,7 +301,7 @@ initial begin
                 
          k = 0;       
         file = $fopen("dendrite.txt", "wb");            
-        while(k<ticks*64) begin
+        while(k<ticks*64) begin      //use this for 8x8 single layer
         @(posedge clk);         
             $fwrite(file, "%s", {
                              BinDecFix[k+63],",",
