@@ -1,6 +1,7 @@
 ![](https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/HedgeHog_Logo.png )
 ## HedgeHog Fused Spiking Neural Network Emulator/Compute Engine for RISC-V
 (June 28, 2020) ASM folder now includes simple demo for 16x16 and 32x32 single layer SNN using untrained weights.  Original demo was only 8x8.  The test bench now defaults to 32x32, but you can still go back to 8x8 or 16x16 by removing comments.  To run the 32x32 demo, place the spikeDemo32x32.HEX and weights_32x32.txt files in the Vivado simulation working directory as explained below.  Also, a couple bugs were fixed in the SpiNNe RTL, so you will need to update with these files before running the 32x32 demo.
+
 (May 3, 2020)   Created specifically for incorporation into a simplified mover “shell” version of the SYMPL 64-bit Universal Floating-Point Compute Engine, this memory-mapped Fused Spiking Neural Network (FSNN) is designed for ready implementation within the programmable fabric of Xilinx® Kintex® UltraTM Plus brand FPGAs. This implementation, including the SYMPL mover “shell” that houses it and makes it go, consumes only 33% of the LUTs in Xilinx's smallest Kintex Ultra Plus device and will clock at over 100MHz in the -3 speed grade.
 
 ![](https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/RISC_V_HedgeHog_Blk.png )
