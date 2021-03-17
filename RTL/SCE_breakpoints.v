@@ -6,9 +6,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                    //
-//                                                    Open-Source                                                     //
+//                                                 SYMPL Open-Source                                                  //
 //                          HedgeHog Fused Spiking Neural Network Emulator/Compute Engine                             //
-//                                          Limited Use Commercial License                                            //
+//                                    Evaluation and Product Development License                                      //
 //                                                                                                                    //
 //                                                                                                                    //
 // Open-source means:  this source code and this instruction set ("this IP") may be freely downloaded, copied,        //
@@ -16,9 +16,10 @@
 //                                                                                                                    //
 // Provided that you comply with all the terms and conditions set forth herein, Jerry D. Harthcock ("licensor"),      //
 // the original author and exclusive copyright owner of this HedgeHog Fused Spiking Neural Network Emulator/Compute   //
-// Engine, including related development software ("this IP"), hereby grants to recipient of this IP ("licensee"),    //
-// a world-wide, paid-up, non-exclusive license to implement and commercially use this IP within the programmable     //
-// fabric of Xilinx Kintex Ultra Plus brand FPGAs--only.                                                              //
+// Engine, including related development software ("this IP"), hereby grants recipient of this IP ("licensee"),       //
+// a world-wide, paid-up, non-exclusive license to implement this IP within the programmable fabric of Xilinx Kintex  //
+// Ultra Plus brand FPGAs--only--and used only for the purposes of evaluation, education, and development of end      //
+// products and related development tools.                                                                            //
 //                                                                                                                    //
 // Furthermore, limited to the purposes of prototyping, evaluation, characterization and testing of implementations   //
 // in a hard, custom or semi-custom ASIC, any university or institution of higher education may have their            //
@@ -30,24 +31,25 @@
 // of this license and original copyright notice at the very top of each source file and any derived netlist, and,    //
 // in the case of binaries, a printed copy of this license and/or a text format copy in a separate file distributed   //
 // with said netlists or binary files having the file name, "LICENSE.txt".  You, the licensee, also agree not to      //
-// remove any copyright notices from any source file covered or distributed under this Limited Use Commercial License.//                               //
+// remove any copyright notices from any source file covered or distributed under this Evaluation and Product         //
+// Development License.                                                                                               //
 //                                                                                                                    //
 // LICENSOR DOES NOT WARRANT OR GUARANTEE THAT YOUR USE OF THIS IP WILL NOT INFRINGE THE RIGHTS OF OTHERS OR          //
 // THAT IT IS SUITABLE OR FIT FOR ANY PURPOSE AND THAT YOU, THE LICENSEE, AGREE TO HOLD LICENSOR HARMLESS FROM        //
 // ANY CLAIM BROUGHT BY YOU OR ANY THIRD PARTY FOR YOUR SUCH USE.                                                     //
 //                                                                                                                    //
 // Licensor reserves all his rights, including, but in no way limited to, the right to change or modify the terms     //
-// and conditions of this Limited Use Commercial License anytime without notice of any kind to anyone.                //
-// By using this IP for any purpose, licensee agrees to all the terms and conditions set forth in this Limited Use    //
-// Commercial License.                                                                                                //
+// and conditions of this Evaluation and Product Development License anytime without notice of any kind to anyone.    //
+// By using this IP for any purpose, licensee agrees to all the terms and conditions set forth in this Evaluation     //
+// and Product Development License.                                                                                   //
 //                                                                                                                    //
-// This Limited Use Commercial License does not include the right to implement or commercially use this IP or any     //
-// IP derived from this IP in any device other than Xilinx Kintex Ultra Plus brand FPGAs. If you would like to obtain //
-// such a license, please contact Licensor.                                                                           //
+// This Evaluation and Product Development License does not include the right to sell products that incorporate       //
+// this IP or any IP derived from this IP. If you would like to obtain such a license, please contact Licensor.       //
 //                                                                                                                    //
 // Licensor can be contacted at:  SYMPL.gpu@gmail.com or Jerry.Harthcock@gmail.com                                    //
 //                                                                                                                    //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
  
  `timescale 1ns/100ps
 
