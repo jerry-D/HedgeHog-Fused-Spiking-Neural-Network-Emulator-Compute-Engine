@@ -1,5 +1,14 @@
 ![](https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/HedgeHog_Logo.png )
 ## HedgeHog Fused Spiking Neural Network Emulator/Compute Engine for RISC-V
+(March 16, 2022) The Universal Floating-Point ISA has issued as US Patent No. US11275584B2.  It can be downloaded using the following link:
+
+https://github.com/jerry-D/64-bit-Universal-Floating-Point-ISA-Compute-Engine/blob/master/US-11275584-B2_I.pdf
+
+There are now two divisional (child) applications spawned from the original (parent) application.  The official filing receipts for the two divisionals can be downloaded using the following links:
+
+https://github.com/jerry-D/64-bit-Universal-Floating-Point-ISA-Compute-Engine/blob/master/17555408_Filing_Receipt.pdf
+https://github.com/jerry-D/64-bit-Universal-Floating-Point-ISA-Compute-Engine/blob/master/17591963-Filing_Receipt.pdf
+
 (March 13, 2021) The Universal Floating-Point ISA specification specification is now published. It can be downloaded using the following link:
 
 https://github.com/jerry-D/64-bit-Universal-Floating-Point-ISA-Compute-Engine/blob/master/Universal_ISA_Publication.pdf
