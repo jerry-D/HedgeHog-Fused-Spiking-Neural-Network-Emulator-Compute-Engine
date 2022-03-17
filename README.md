@@ -7,6 +7,7 @@ https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Comput
 There are now two divisional (child) applications spawned from the original (parent) application.  The official filing receipts for the two divisionals can be downloaded using the following links:
 
 https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/17555408_Filing_Receipt.pdf
+
 https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/17591963-Filing_Receipt.pdf
 
 (March 13, 2021) The Universal Floating-Point ISA specification specification is now published. It can be downloaded using the following link:
