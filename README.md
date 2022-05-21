@@ -3,6 +3,7 @@
 (May 19, 2022) The 1st and 2nd Divisional applications to parent US Patent No. US11275584-B2 have been published at the USPTO.  A .pdf for each has been added to this repository for your convenience.  These .pdfs contain only the portions that are different from the original parent.  Here are the links:
 
 https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/pub_17555408_merged.pdf
+
 https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/DIV2_P1_claims.pdf
 
 
