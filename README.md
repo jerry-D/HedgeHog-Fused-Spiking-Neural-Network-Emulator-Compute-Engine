@@ -1,21 +1,16 @@
 ![](https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/HedgeHog_Logo.png )
 ## HedgeHog Fused Spiking Neural Network Emulator/Compute Engine for RISC-V
-(May 19, 2022) The 1st and 2nd Divisional applications to parent US Patent No. US11275584-B2 have been published at the USPTO.  A .pdf for each has been added to this repository for your convenience.  These .pdfs contain only the portions that are different from the original parent.  Here are the links:
+(April 25, 2023) The 1st and 2nd Divisional patents to parent US Patent No. US11275584-B2 have been officially issued at the USPTO.  A .pdf for each has been added to this repository for your convenience.  These .pdfs contain only the portions that are different from the original parent (i.e., face page with abstract and Claims pages.)  Here are the links:
 
-https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/pub_17555408_merged.pdf
+https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/US_11635957_B2_P1.pdf
 
-https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/DIV2_P1_claims.pdf
+https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/US_11635956_B2_P1.pdf
 
 
-(March 16, 2022) The Universal Floating-Point ISA has issued as US Patent No. US11275584B2.  It can be downloaded using the following link:
+(March 16, 2022) The Universal Floating-Point ISA (parent application) issued as US Patent No. US11275584B2.  It can be downloaded using the following link:
 
 https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/US-11275584-B2_I.pdf
 
-There are now two divisional (child) applications spawned from the original (parent) application.  The official filing receipts for the two divisionals can be downloaded using the following links:
-
-https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/17555408_Filing_Receipt.pdf
-
-https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/17591963-Filing_Receipt.pdf
 
 (March 13, 2021) The Universal Floating-Point ISA specification specification is now published. It can be downloaded using the following link:
 
