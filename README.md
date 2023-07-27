@@ -1,6 +1,6 @@
 ![](https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/HedgeHog_Logo.png )
 ## HedgeHog Fused Spiking Neural Network Emulator/Compute Engine for RISC-V
-(July 27, 2020) Open Letter to the IEEE concerning the newly patented IEEE 754-2019 Floating-Point ISA and proposal that it be adopted as a Standard IEEE Floating-Point ISA.  Here is the link:
+(July 27, 2023) Open Letter to the IEEE concerning the newly patented IEEE 754-2019 Floating-Point ISA and proposal that it be adopted as a Standard IEEE Floating-Point ISA.  Here is the link:
 
 https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/Open_Letter_to_IEEE_B_redacted.pdf
 
