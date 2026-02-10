@@ -1,4 +1,9 @@
 ![](https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/HedgeHog_Logo.png )
+
+Here is a .pdf information sheet on the HedgeHog FSNN Emulator/Compute Engine:
+
+https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/HedgeHog.pdf 
+
 ## HedgeHog Fused Spiking Neural Network Emulator/Compute Engine for RISC-V
 (July 27, 2023) Open Letter to the IEEE concerning the newly patented IEEE 754-2019 Floating-Point ISA and proposal that it be adopted as a Standard IEEE Floating-Point ISA.  Here is the link:
 
@@ -31,9 +36,6 @@ The real-time monitor and data exchange feature of the mover shell enables a RIS
 The Verilog test bench available at the SYMPL HedgeHog repository at GitHub automatically converts human-readable decimal character sequences for weights and thresholds, enabling you to create your test data using Google Sheets online spreadsheet. When your test
 run is complete, the test bench then automatically converts the binary formatted floating-point trace buffer results from each dendrite and membrane level to decimal character sequences before writing them to their respective output files, enabling you to view your results in numeric or graphic form using Google Sheets online spreadsheet. For examples of resulting graphs on data produced by the Verilog test bench simulations, refer to the “HedgeHog.pdf” document below.  If you are exploring or experimenting with spiking neural networks for FPGA embeddable AI applications using RISC-V as host CPU, then the SYMPL HedgeHog is for you. 
 
-Here is a .pdf information sheet on the HedgeHog FSNN Emulator/Compute Engine:
-
-https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/HedgeHog.pdf 
 
 ## Simulating in Xilinx Vivado IDE
 All the Verilog RTL source files that you will need are located in the “RTL", "ASM", "test bench", and "sim" folders at this repository.  The top level module is “HedgeHog.v”.  It is suggested that when creating your project in Vivado the first time, you select the Xilinx Kintex Ultra+ xcku5p-ffvd-900-3-e as your target device.  After creating your project in Vivado, you will need to click on the “Compile Order” tab, click on “HedgeHog” and slide it up to the top.  Under the "Sources" tab, at the bottom of the panel, click "hierarchy", then right-click on "HedgeHog" and select "Set as Top" if not already in bold font.  
