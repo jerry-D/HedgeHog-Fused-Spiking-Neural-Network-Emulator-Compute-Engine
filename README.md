@@ -16,7 +16,7 @@ https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Comput
 https://github.com/jerry-D/HedgeHog-Fused-Spiking-Neural-Network-Emulator-Compute-Engine/blob/master/US-11275584-B2_I.pdf
 
 
-(March 13, 2021) The Universal Floating-Point ISA specification specification is now published. It can be downloaded using the following link:
+(March 13, 2021) The Universal Floating-Point ISA specification is now published. It can be downloaded using the following link:
 
 https://github.com/jerry-D/64-bit-Universal-Floating-Point-ISA-Compute-Engine/blob/master/Universal_ISA_Publication.pdf
 
